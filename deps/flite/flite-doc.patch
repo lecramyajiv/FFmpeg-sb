@@ -1,0 +1,25 @@
+--- flite.texi	2020-08-13 05:47:09.000000000 +0530
++++ flite1.texi	2024-10-26 14:42:32.465589000 +0530
+@@ -70,6 +70,8 @@
+ by the Carnegie Mellon University
+ @end titlepage
+ 
++@contents
++
+ @node Top, , , (dir)
+ 
+ @menu
+@@ -1322,13 +1324,4 @@
+ The copy the @file{.c} and @file{.h} files to @file{lang/cmu_pashto_lex/}
+ [something about compressed and non-compressed???]
+ 
+-
+-@chapter Porting to new platforms
+-
+-byte order, unions, compiler restrictions
+-
+-@chapter Future developments
+-
+-@contents
+-
+ @bye
