@@ -1,4 +1,9 @@
 DevIL
+rapidjson
+fmt
+CLI11
+range-v3
+ghc_filesystem
 AviSynthPlus
 chromaprint
 ladspa_sdk

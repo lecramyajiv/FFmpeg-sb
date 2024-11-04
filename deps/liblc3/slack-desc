@@ -6,7 +6,7 @@
 # customary to leave one space after the ':' except on otherwise blank lines.
 
       |-----handy-ruler------------------------------------------------------|
-liblc3: liblc3 (:ow Complexity Communication Codec)
+liblc3: liblc3 (low Complexity Communication Codec)
 liblc3:
 liblc3: LC3 and LC3 plus are audio codecs designed for low latency
 liblc3: audio transport.

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Slackware build script for FFmpeg-opt
+# Slackware build script for FFmpeg-git
 
 # Copyright 2024 Vijay Marcel
 # All rights reserved.
@@ -24,7 +24,7 @@
 
 cd $(dirname $0) ; CWD=$(pwd)
 
-PRGNAM=FFmpeg-opt
+PRGNAM=FFmpeg-git
 VERSION=${VERSION:-7.1}
 BUILD=${BUILD:-1}
 TAG=${TAG:-_SBo}
@@ -66,8 +66,9 @@ rm -rf $PKG
 mkdir -pv $TMP $PKG $OUTPUT
 cd $TMP
 rm -rf $SRCNAM-$VERSION
-tar xvf $CWD/$SRCNAM-$VERSION.tar.xz
-cd $SRCNAM-$VERSION
+rm -rf $SRCNAM
+git clone https://git.ffmpeg.org/ffmpeg.git
+cd $SRCNAM
 chown -R root:root .
 find -L . \
  \( -perm 777 -o -perm 775 -o -perm 750 -o -perm 711 -o -perm 555 \
