@@ -1,0 +1,183 @@
+#!/bin/bash
+
+# Slackware build script for shaderc
+
+# Copyright 2025 Vijay Marcel
+# All rights reserved.
+#
+# Redistribution and use of this script, with or without modification, is
+# permitted provided that the following conditions are met:
+#
+# 1. Redistributions of this script must retain the above copyright
+#    notice, this list of conditions and the following disclaimer.
+#
+#  THIS SOFTWARE IS PROVIDED BY THE AUTHOR "AS IS" AND ANY EXPRESS OR IMPLIED
+#  WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+#  MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO
+#  EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+#  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+#  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
+#  OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+#  WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
+#  OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
+#  ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+cd $(dirname $0) ; CWD=$(pwd)
+
+PRGNAM=shaderc
+VERSION=${VERSION:-2024.3}
+BUILD=${BUILD:-2}
+TAG=${TAG:-_SBo}
+PKGTYPE=${PKGTYPE:-tgz}
+nprocr=$(expr $(nproc) + 1)
+
+if [ -z "$ARCH" ]; then
+  case "$( uname -m )" in
+    i?86) ARCH=i586 ;;
+    arm*) ARCH=arm ;;
+       *) ARCH=$( uname -m ) ;;
+  esac
+fi
+
+if [ ! -z "${PRINT_PACKAGE_NAME}" ]; then
+  echo "$PRGNAM-$VERSION-$ARCH-$BUILD$TAG.$PKGTYPE"
+  exit 0
+fi
+
+TMP=${TMP:-/tmp/lec}
+PKG=$TMP/package-$PRGNAM
+OUTPUT=${OUTPUT:-/tmp}
+
+if [ "$ARCH" = "i586" ]; then
+  SLKCFLAGS="-march=i586 -mtune=i686 -pipe -O2 -fPIC"
+  LIBDIRSUFFIX=""
+elif [ "$ARCH" = "i686" ]; then
+  SLKCFLAGS="-march=i686 -mtune=i686 -pipe -O2 -fPIC"
+  LIBDIRSUFFIX=""
+elif [ "$ARCH" = "x86_64" ]; then
+  SLKCFLAGS="-march=x86-64 -mtune=generic -pipe -O2 -fPIC"
+  LIBDIRSUFFIX="64"
+elif [ "$ARCH" = "aarch64" ]; then
+  SLKCFLAGS="-O2 -fPIC"
+  LIBDIRSUFFIX="64"
+else
+  SLKCFLAGS="-O2"
+  LIBDIRSUFFIX=""
+fi
+
+set -e
+trap 'echo "$0 FAILED at line $LINENO!" | tee -a $OUTPUT/error-${PRGNAM}.log' ERR
+
+rm -rf $PKG
+mkdir -p $TMP $PKG $OUTPUT
+cd $TMP
+rm -rf $PRGNAM-$VERSION
+wget --content-disposition https://github.com/KhronosGroup/glslang/archive/vulkan-sdk-1.3.296.0/glslang-vulkan-sdk-1.3.296.0.tar.gz
+wget --content-disposition https://github.com/KhronosGroup/SPIRV-Tools/archive/vulkan-sdk-1.3.296.0/SPIRV-Tools-vulkan-sdk-1.3.296.0.tar.gz
+wget --content-disposition https://github.com/KhronosGroup/SPIRV-Headers/archive/vulkan-sdk-1.3.296.0/SPIRV-Headers-vulkan-sdk-1.3.296.0.tar.gz
+wget --content-disposition https://github.com/abseil/abseil-cpp/archive/20240722.0/abseil-cpp-20240722.0.tar.gz
+wget --content-disposition https://github.com/google/re2/archive/2024-07-02/re2-2024-07-02.tar.gz
+git clone https://github.com/google/effcee.git
+tar xvf abseil-cpp-20240722.0.tar.gz
+tar xvf re2-2024-07-02.tar.gz
+tar xvf glslang-vulkan-sdk-1.3.296.0.tar.gz
+cd $TMP/glslang-vulkan-sdk-1.3.296.0/External
+tar xvf $TMP/SPIRV-Tools-vulkan-sdk-1.3.296.0.tar.gz
+mv -v SPIRV-Tools-vulkan-sdk-1.3.296.0 spirv-tools
+cd spirv-tools/external
+tar xvf $TMP/SPIRV-Headers-vulkan-sdk-1.3.296.0.tar.gz
+mv -v SPIRV-Headers-vulkan-sdk-1.3.296.0 spirv-headers
+cp -r /tmp/lec/abseil-cpp-20240722.0 /tmp/lec/effcee/third_party/abseil-cpp
+cp -r /tmp/lec/re2-2024-07-02 /tmp/lec/effcee/third_party/re2
+cd $TMP
+tar xvf $CWD/$PRGNAM-$VERSION.tar.gz
+cd $PRGNAM-$VERSION
+chown -R root:root .
+find -L . \
+ \( -perm 777 -o -perm 775 -o -perm 750 -o -perm 711 -o -perm 555 \
+  -o -perm 511 \) -exec chmod 755 {} \; -o \
+ \( -perm 666 -o -perm 664 -o -perm 640 -o -perm 600 -o -perm 444 \
+  -o -perm 440 -o -perm 400 \) -exec chmod 644 {} \;
+
+export CC=${CC:-gcc}
+export CXX=${CXX:-g++}
+
+export VH1=${VH1:-/opt}
+export VH2=${VH2:-/opt/include}
+export VH3=${VH3:-/opt/share}
+export VL1=${VL1:-/opt/lib64}
+export VL2=${VL2:-/opt/lib64/cmake/VulkanLoader}
+export VL3=${VL3:-/opt/lib64/pkgconfig}
+export S={S:-/opt/include/spirv}
+export B={B:-/opt/bin}
+
+export PATH=$PATH:$VH1:$VH2:$VH3:$VL1:$VL2:$S:$B
+export PKG_CONFIG_PATH=$VL3:$PKG_CONFIG_PATH
+export LD_LIBRARY_PATH=$VL1:$LD_LIBRARY_PATH
+
+mkdir -pv $PKG/opt/include
+mkdir -pv $PKG/opt/lib${LIBDIRSUFFIX}
+mkdir -pv $PKG/opt/share
+mkdir -pv $PKG/opt/bin
+
+sed -i "s|\['git', 'describe'\]|\['cat', '.git-version'\]|" \
+  utils/update_build_version.py
+
+cmake -B build -S $TMP/$PRGNAM-$VERSION -G Ninja \
+    -DCMAKE_C_FLAGS:STRING="$SLKCFLAGS" \
+    -DCMAKE_CXX_FLAGS:STRING="$SLKCFLAGS" \
+    -DCMAKE_INSTALL_PREFIX:PATH=/opt \
+    -DCMAKE_INSTALL_LIBDIR:PATH=/opt/lib${LIBDIRSUFFIX} \
+    -DCMAKE_INSTALL_INCLUDEDIR:PATH=/opt/include \
+    -DCMAKE_SKIP_RPATH=TRUE \
+    -DSHADERC_SKIP_TESTS=ON \
+    -DPYTHON_EXECUTABLE=/usr/bin/python3 \
+    -DSHADERC_SPIRV_HEADERS_DIR=$TMP/glslang-vulkan-sdk-1.3.296.0/External/spirv-tools/external/spirv-headers \
+    -DSHADERC_SPIRV_TOOLS_DIR=$TMP/glslang-vulkan-sdk-1.3.296.0/External/spirv-tools \
+    -DSHADERC_GLSLANG_DIR=$TMP/glslang-vulkan-sdk-1.3.296.0 \
+    -DSHADERC_ABSL_DIR=$TMP/abseil-cpp-20240722.0 \
+    -DSHADERC_RE2_DIR=$TMP/re2-2024-07-02 \
+    -DSHADERC_TINT_DIR=$TMP/tint \
+    -DSHADERC_EFFCEE_DIR=$TMP/effcee \
+    -DSKIP_GLSLANG_INSTALL=OFF \
+    -DSKIP_SPIRV_TOOLS_INSTALL=OFF \
+    -DSKIP_GOOGLETEST_INSTALL=ON \
+    -DSHADERC_ENABLE_WGSL_OUTPUT=OFF \
+    -DSHADERC_ENABLE_INSTALL=ON \
+    -DSHADERC_SKIP_EXAMPLES=ON \
+    -DSHADERC_SKIP_COPYRIGHT_CHECK=ON \
+    -DBUILD_SHARED_LIBS=OFF \
+    -DSPIRV_TOOLS_BUILD_STATIC=ON \
+    -DBUILD_TESTING=OFF \
+    -DCMAKE_BUILD_TYPE=Release
+
+#ninja -j$nprocr -C build
+#DESTDIR=$PKG  ninja -C build install
+
+cmake --build build --parallel $nprocr
+DESTDIR=$PKG cmake --install build
+
+# Don't ship .la files:
+rm -f $PKG/opt/lib${LIBDIRSUFFIX}/*.la
+
+find $PKG -print0 | xargs -0 file | grep -e "executable" -e "shared object" | grep ELF \
+  | cut -f 1 -d : | xargs strip --strip-unneeded --remove-section=.comment --remove-section=.note 2> /dev/null || true
+
+# Fix pkgconfig files
+
+for pc in $(ls $PKG/opt/lib64/pkgconfig/*.pc) ; do
+    sed -i -e 's|libdir=${prefix}//opt/lib64|libdir=${prefix}/lib64|g' \
+           -e 's|includedir=${prefix}//opt/include|includedir=${prefix}/include|g' \
+    $pc
+done
+
+
+mkdir -p $PKG/usr/doc/$PRGNAM-$VERSION
+cp -a AUTHORS LICENSE README.md $PKG/usr/doc/$PRGNAM-$VERSION
+cat $CWD/$PRGNAM.SlackBuild > $PKG/usr/doc/$PRGNAM-$VERSION/$PRGNAM.SlackBuild
+
+mkdir -p $PKG/install
+cat $CWD/slack-desc > $PKG/install/slack-desc
+
+cd $PKG
+/sbin/makepkg -l y -c n $OUTPUT/$PRGNAM-$VERSION-$ARCH-$BUILD$TAG.$PKGTYPE
