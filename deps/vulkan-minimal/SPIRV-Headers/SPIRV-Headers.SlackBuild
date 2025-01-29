@@ -1,8 +1,8 @@
 #!/bin/bash
 
-# Slackware build script for vulkan-headers
+# Slackware build script for SPIRV-Headers
 
-# Copyright 2024-2025 Vijay Marcel
+# Copyright 2024 Vijay Marcel
 # All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -19,12 +19,11 @@
 
 cd $(dirname $0) ; CWD=$(pwd)
 
-PRGNAM=vulkan-headers
+PRGNAM=SPIRV-Headers
 VERSION=${VERSION:-1.4.304.0}
 BUILD=${BUILD:-1}
-TAG=${TAG:-_SBo}
+TAG=${TAG:-_lec}
 PKGTYPE=${PKGTYPE:-tgz}
-SRCNAM=${SRCNAM:-Vulkan-Headers}
 GITAG=${GITAG:-vulkan-sdk}
 
 if [ -z "$ARCH" ]; then
@@ -53,23 +52,20 @@ elif [ "$ARCH" = "i686" ]; then
 elif [ "$ARCH" = "x86_64" ]; then
   SLKCFLAGS="-march=x86-64 -mtune=generic -pipe -O2 -fPIC"
   LIBDIRSUFFIX="64"
-elif [ "$ARCH" = "aarch64" ]; then
-  SLKCFLAGS="-O2 -fPIC"
-  LIBDIRSUFFIX="64"
 else
   SLKCFLAGS="-O2"
   LIBDIRSUFFIX=""
 fi
 
-set -eu
+set -e
 trap 'echo "$0 FAILED at line $LINENO!" | tee -a $OUTPUT/error-${PRGNAM}.log' ERR
 
 rm -rf $PKG
 mkdir -p $TMP $PKG $OUTPUT
 cd $TMP
-rm -rf $SRCNAM-$VERSION
-tar xvf $CWD/$SRCNAM-$GITAG-$VERSION.tar.gz
-cd $SRCNAM-$GITAG-$VERSION
+rm -rf $PRGNAM-$GITAG-$VERSION
+tar xvf $CWD/$PRGNAM-$GITAG-$VERSION.tar.gz
+cd $PRGNAM-$GITAG-$VERSION
 chown -R root:root .
 find -L . \
  \( -perm 777 -o -perm 775 -o -perm 750 -o -perm 711 -o -perm 555 \
@@ -77,23 +73,35 @@ find -L . \
  \( -perm 666 -o -perm 664 -o -perm 640 -o -perm 600 -o -perm 444 \
   -o -perm 440 -o -perm 400 \) -exec chmod 644 {} \;
 
-mkdir -pv $PKG/opt
-mkdir -pv $PKG/opt/include
-mkdir -pv $PKG/opt/share
 
-cmake -B build -S $TMP/$SRCNAM-$GITAG-$VERSION -G Ninja  \
+export VH1=${VH1:-/opt}
+export VH2=${VH2:-/opt/include}
+export VH3=${VH3:-/opt/share}
+export VL1=${VL1:-/opt/lib64}
+export VL2=${VL2:-/opt/lib64/cmake/VulkanLoader}
+export VL3=${VL3:-/opt/lib64/pkgconfig}
+
+export PATH=$VH1:$VH2:$VH3:$VL1:$VL2:$PATH
+export PKG_CONFIG_PATH=$VL3:$PKG_CONFIG_PATH
+export LD_LIBRARY_PATH=$VL1:$LD_LIBRARY_PATH
+
+mkdir -pv $PKG/opt/include  #PRGNAM=SPIRV-Headers
+mkdir -pv $PKG/opt/lib${LIBDIRSUFFIX}
+mkdir -pv $PKG/opt/share
+mkdir -pv $PKG/opt/etc
+
+cmake -B build -S $TMP/$PRGNAM-$GITAG-$VERSION \
     -DCMAKE_C_FLAGS:STRING="$SLKCFLAGS" \
     -DCMAKE_CXX_FLAGS:STRING="$SLKCFLAGS" \
     -DCMAKE_INSTALL_PREFIX:PATH=/opt \
+    -DCMAKE_INSTALL_LIBDIR:PATH=/opt/lib${LIBDIRSUFFIX} \
     -DCMAKE_INSTALL_INCLUDEDIR:PATH=/opt/include \
-    -DCMAKE_INSTALL_DATADIR:PATH=/opt/share \
-    -DVULKAN_HEADERS_ENABLE_MODULE:BOOL=ON \
-    -DVULKAN_HEADERS_ENABLE_INSTALL=ON \
-    -DVULKAN_HEADERS_ENABLE_TESTS=OFF \
+    -DSPIRV_HEADERS_ENABLE_INSTALL:BOOL=ON \
+    -DSPIRV_HEADERS_ENABLE_TESTS:BOOL=OFF \
     -DCMAKE_BUILD_TYPE=Release
 
-ninja -C build
-DESTDIR=$PKG ninja -C build install
+cmake --build build
+DESTDIR=$PKG cmake --install build
 
 # Don't ship .la files:
 rm -f $PKG/opt/lib${LIBDIRSUFFIX}/*.la
@@ -102,12 +110,11 @@ find $PKG -print0 | xargs -0 file | grep -e "executable" -e "shared object" | gr
   | cut -f 1 -d : | xargs strip --strip-unneeded --remove-section=.comment --remove-section=.note 2> /dev/null || true
 
 mkdir -pv $PKG/usr/doc/$PRGNAM-$VERSION
-cp -av LICENSES README.md LICENSE.md SECURITY.md  $PKG/usr/doc/$PRGNAM-$VERSION
+cp -a LICENSE README.md $PKG/usr/doc/$PRGNAM-$VERSION
 cat $CWD/$PRGNAM.SlackBuild > $PKG/usr/doc/$PRGNAM-$VERSION/$PRGNAM.SlackBuild
 
 mkdir -p $PKG/install
 cat $CWD/slack-desc > $PKG/install/slack-desc
-
 
 cd $PKG
 /sbin/makepkg -l y -c n $OUTPUT/$PRGNAM-$VERSION-$ARCH-$BUILD$TAG.$PKGTYPE
