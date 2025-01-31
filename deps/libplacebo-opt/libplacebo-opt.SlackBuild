@@ -48,8 +48,6 @@ TMP=${TMP:-/tmp/SBo}
 PKG=$TMP/package-$PRGNAM
 OUTPUT=${OUTPUT:-/tmp}
 
-#  -I/opt/include -L/opt/lib64 SLDFLAG="" SLDFLAG="-L/opt/lib64"
-
 if [ "$ARCH" = "i586" ]; then
   SLKCFLAGS="-march=i586 -mtune=i686 -pipe -O2 -fPIC"
   LIBDIRSUFFIX=""
