@@ -1,0 +1,43 @@
+libbluray,libcaca,libxml2 not compiling statically with ffmpeg
+
+
+
+ To allow libvdpau to find libvdpau-va-gl, set an environment variable. As the root user:
+
+echo "export VDPAU_DRIVER=va_gl" >> /etc/profile.d/xorg.sh
+
+libmfx is depreceated
+vdpau won't build static libs
+
+for rtmp: libgmp
+for SSL: libressl
+hardware accel: opencl and libvpl
+choose ladspa lv2 needs openblas and python3-numpy
+
+consider removeing /opt/bin/bzegrep -> /tmp/SBo/dep/usr/bin/bzgrep
+package contains symlinks outside the package (which is OK, if intentional):
+lrwxrwxrwx 1 root root 27 Jan 21 23:03 ./opt/bin/bzegrep -> /tmp/SBo/dep/usr/bin/bzgrep
+OK
+
+
+
+Please note that the default VMAF model
+("/usr/local/share/model/vmaf_v0.6.1.json")
+will be used unless you set the following flag when running the encoder:
+
+~~~
+    # --vmaf-model-path=path/to/model
+~~~
+
+
+devil is built as a shared library
+python3-build and python3-wheel is needed from SBo
+
+from system
+freior
+rsvg
+lcevcdec as shared lib
+
+remove ffmpeg  beforehand zulu-openjdk apache-ant
+python3-build wheel lcevcdec shaderc vulkan-headers vulkan-loader libiec61883
+
