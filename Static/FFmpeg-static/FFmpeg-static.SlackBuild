@@ -1,0 +1,3380 @@
+#!/bin/bash
+
+# Slackware build script for FFmpeg-static
+
+# Copyright 2024 Vijay Marcel
+# All rights reserved.
+#
+# Redistribution and use of this script, with or without modification, is
+# permitted provided that the following conditions are met:
+#
+# 1. Redistributions of this script must retain the above copyright
+#    notice, this list of conditions and the following disclaimer.
+#
+#  THIS SOFTWARE IS PROVIDED BY THE AUTHOR "AS IS" AND ANY EXPRESS OR IMPLIED
+#  WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+#  MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO
+#  EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+#  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+#  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
+#  OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+#  WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
+#  OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
+#  ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+cd $(dirname $0) ; CWD=$(pwd)
+
+PRGNAM=FFmpeg-static
+BUILD=${BUILD:-1}
+TAG=${TAG:-_lec}
+PKGTYPE=${PKGTYPE:-txz}
+SRCNAM=${SRCNAM:-ffmpeg}
+nprocr=$(expr $(nproc) + 1)
+sys_arch=${sys_arch:-$(uname -m)}
+
+case "$sys_arch" in
+   	x86_64) export ARCH=x86_64 ;;
+	     *) echo "This SlackBuild will not run on $sys_arch platform" && exit 1 ;;
+esac
+
+if [ ! -z "${PRINT_PACKAGE_NAME}" ]; then
+  echo "$PRGNAM-$VERSION-$ARCH-$BUILD$TAG.$PKGTYPE"
+  exit 0
+fi
+
+USER=${USER:-$(id -u -n)}
+TMP=${TMP:-/tmp/SBo}
+PKG=$TMP/package-$PRGNAM
+PKGD=$TMP/dep
+OUTPUT=${OUTPUT:-/tmp}
+
+#-fsanitize=undefined
+#export hflags="-fexceptions -fstack-protector-strong -fstack-clash-protection -mindirect-branch=thunk -mfunction-return=thunk"
+export clfgs="-Wl,--sort-common=ascending -Wl,--sort-section=alignment -Wl,--gc-sections"
+export hlflags="$clfgs -Wl,-z,common -Wl,-z,separate-code -Wl,-z,muldefs -Wl,-z,noexecstack"
+export pflg="-Wno-implicit-function-declaration -Wno-incompatible-pointer-types -fno-delete-null-pointer-checks -ffunction-sections -fdata-sections"
+export pxflg="-fno-delete-null-pointer-checks -ffunction-sections -fdata-sections"
+
+if [ "$ARCH" = "x86_64" ]; then
+  SCFLAGS="-pthread -march=x86-64 -mtune=native -fcommon $pflg -pipe -O2 -fPIC"
+  SCXXFLAGS="-pthread -march=x86-64 -mtune=native -fcommon $pxflg -pipe -O2 -fPIC"
+  SLDFLAGS="$hlflags -pthread -ldl -lm -lrt"
+  LIBDIRSUFFIX="64"
+else
+  echo "this slackbuild will work only on $ARCH" && exit 1
+fi
+
+set -e
+trap 'echo "$0 FAILED at line $LINENO!" | tee -a $OUTPUT/error-${PRGNAM}.log' ERR
+
+export CC=${CC:-gcc}
+export CXX=${CXX:-g++}
+export CFLAGS="$SCFLAGS"
+export CXXFLAGS="$SCXXFLAGS"
+export LDFLAGS="$SLDFLAGS"
+
+bzipver=1.0.8 # Bzip2
+zlibver=1.3.1 # zlib
+gmpver=6.3.0 # Gmp
+xzver=5.6.2  # Xz and LZMA
+arbver=1.0.3  # aribb24
+arbcver=1.1.1 # aribbcaption
+fdkver=2.0.3 # fdk-aac
+amrver=0.1.6 # opencore-amr
+voamrver=0.1.3 #vo-amrwbenc
+xavs2ver=1.4 # xavs2
+lamever=3.100 #LAME
+xml2ver=2.11.9 # libxml2
+dnaver=6.1.1 # libdvdnav
+dvrver=6.1.3 # libdvdread
+x265ver=4.0 # x265
+ftver=2.13.3 # Freetype2
+fbidiver=1.0.16 # Fribidi
+focver=2.15.0 # Fontconfig
+hbuzver=9.0.0 # Harfbuzz
+mesver=1.6.1 # meson
+cmver=3.31.3 # cmake
+ninver=1.12.1 # ninja
+expver=2.6.4 # Expat
+brotver=1.1.0 # Brotli
+oggver=1.3.5 # Ogg
+vorbver=1.3.7 # Vorbis
+opusver=1.5.2 # Opus
+gsmver=1.0.22 #  libgsm
+pngver=1.6.44 # png
+apngver=1.6.44 # apng [animated png]
+jptver=3.1.0    # libjpeg-turbo
+tiffver=4.7.0  # libtiff
+sdlver=2.30.6 # SDL
+theover=1.1.1 # Theora
+speexver=1.2.1 # speex
+twolver=0.4.0 # Twolame
+xvidver=1.3.7 # xvidcore
+lpcver=0.5 # LPcnet
+codver=1.2.0  # Codec2
+bluver=1.3.4 # Bluray
+caver=0.99.beta19 # libcaca
+vmafver=3.0.0 # libvmaf
+aomver=3.11.0 # aom
+aacsver=0.11.0 # libaacs
+yuvver=0.0.1899.20250103-1 # libyuv
+yuv=libyuv-debian  # yuv name
+svtnam=${svtnam:-SVT-AV1-v2.3.0}  # svt-av1
+rawver=2.1.2 # libraw1394
+avcver=0.5.4 # libavc1394
+dcver=2.2.7 # libdc1394
+iecver=1.2.0 # libiec61883
+gmever=0.6.3 # libgme
+daver=1.5.0 # libdav1d
+ilbver=3.0.4 # libilbc
+ojver=2.5.3 # openjpeg2
+lcmver=2.16 # lcms2
+usbver=1.0.27 # libusb
+snaver=1.2.1 # snappy
+srver=1.5.4 # srt
+webpver=1.5.0 # libwebp
+vpxver=1.15.0 # libvpx
+tlsver=4.0.0 # libressl
+drmver=2.4.124 # libdrm
+vaaver=2.22.0 # libva
+vdpaver=1.5 # libvdpau
+vplver=2.14.0 # libvpl
+ohver=2.5.0 # openh264
+vulkver=1.4.304 # vulkan Headers
+fftver=3.3.10 # fftw
+numaver=2.0.19 # numactl
+
+rm -rvf $PKG
+mkdir -pv $TMP $PKG $OUTPUT $PKGD
+cd $TMP
+rm -rf $SRCNAM-$VERSION
+mkdir -pv $TMP/ffbld
+export FFSRC=${FFSRC:-/tmp/ffsrc}
+export FFBLD=${FFBLD:-$TMP/ffbld}
+cd $FFBLD
+
+# Installing Cmake This is a binary build of cmake to speed the build the process
+
+tar xvf $FFSRC/cmake-$cmver-linux-$ARCH.tar.gz
+cd cmake-$cmver-linux-$ARCH
+chown -R root:root .
+find . -perm 777 -exec chmod 755 {} \+
+find . -perm 664 -exec chmod 644 {} \+
+
+mkdir -pv $PKGD/usr/bin
+mkdir -pv $PKGD/usr/share
+mkdir -pv $PKGD/usr/man
+
+mv -v bin/* $PKGD/usr/bin
+mv -v man/* $PKGD/usr/man
+mv -v share/*  $PKGD/usr/share
+
+mkdir -pv $PKGD/doc/cmake-$cmver
+rm -rvf doc/cmake/html
+mv -v doc/* $PKGD/doc/cmake-$cmver
+
+cd $FFBLD
+
+# Installing Ninja This is a binary build of ninja to speed the build the process
+
+unzip $FFSRC/ninja-linux.zip -d $PKGD/usr/bin
+
+cd $FFBLD
+
+export i=$PKGD/usr/share/cmake-$cmver/include # Cmake include
+export m=$PKGD/usr/share/cmake-$cmver/Modules # cmake module path
+export cl=$PKGD/usr/lib64/cmake  # deps .cmake path
+export vl=${vl:-/opt/lib64}
+export vb=${vb:-/opt/bin}
+export vi=${vi:-/opt/include}
+export vs=${vs:-/opt/share/cmake}
+#export vp=${vp:-/opt/lib64/pkgconfig} :$vp
+
+PYVER=$(python3 -c 'import sys; print("%d.%d" % sys.version_info[:2])')
+export PYTHONPATH=$PKGD/usr/lib64/python$PYVER/site-packages # python path
+PATH=$PKGD/usr/bin:$PKGD/usr/include:$PKGD/usr/lib:$PKGD/usr/lib64:$PKGD/usr/lib64/pkgconfig:$PYTHONPATH:$i:$m:$cl:$vl:$vb:$vi:$vs:$PATH
+
+# Building Meson
+
+tar xvf $FFSRC/meson-$mesver.tar.gz
+cd meson-$mesver
+chown -R root:root .
+find . -perm 777 -exec chmod 755 {} \+
+find . -perm 664 -exec chmod 644 {} \+
+
+python3 -m build --wheel --no-isolation
+python3 -m installer --destdir "$PKGD" dist/*.whl
+
+mkdir -pv $PKGD/doc/meson-$mesver
+cp -a contributing.md COPYING PKG-INFO README* $PKGD/doc/meson-$mesver
+
+rm -vf $PKGD/usr/lib${LIBDIRSUFFIX}/*.la
+find $PKGD/usr/lib${LIBDIRSUFFIX} -name "*.so*" -exec rm -vf {} \+
+
+cd $FFBLD
+
+# Building Bzip2
+
+tar xvf $FFSRC/bzip2-$bzipver.tar.gz
+cd bzip2-$bzipver
+chown -R root:root .
+find . -perm 777 -exec chmod 755 {} \+
+find . -perm 664 -exec chmod 644 {} \+
+
+make install CFLAGS="$SCFLAGS" LDFLAGS="$SLDFLAGS" PREFIX=$PKGD/usr 2>&1 | tee -a $OUTPUT/install-bzip.log
+
+mkdir -pv $PKGD/doc/bzip2-$bzipver
+cp -av manual.pdf LICENSE README $PKGD/doc/bzip2-$bzipver
+
+cd $FFBLD
+
+# Building Zlib
+
+tar xvf $FFSRC/zlib-$zlibver.tar.gz
+cd zlib-$zlibver
+chown -R root:root .
+find . -perm 777 -exec chmod 755 {} \+
+find . -perm 664 -exec chmod 644 {} \+
+
+cmake -B build -S $FFBLD/zlib-$zlibver \
+    -DCMAKE_C_FLAGS:STRING="-I$PKGD/usr/include $SCFLAGS" \
+    -DCMAKE_CXX_FLAGS:STRING="-I$PKGD/usr/include $SCXXFLAGS" \
+    -DCMAKE_EXE_LINKER_FLAGS="-L$PKGD/usr/lib -L$PKGD/usr/lib64 $SLDFLAGS"  \
+    -DCMAKE_INSTALL_PREFIX=/usr \
+    -DINSTALL_LIB_DIR=/usr/lib${LIBDIRSUFFIX} \
+    -DINSTALL_INC_DIR=/usr/include \
+    -DINSTALL_MAN_DIR=/usr/man \
+    -DINSTALL_PKGCONFIG_DIR=/usr/lib${LIBDIRSUFFIX}/pkgconfig \
+    -DZLIB_BUILD_EXAMPLES=OFF \
+    -DSKIP_INSTALL_LIBRARIES=ON \
+    -DBUILD_SHARED_LIBS:BOOL=OFF \
+    -DCMAKE_BUILD_TYPE=Release
+
+cmake --build build --parallel $nprocr 2>&1 | tee -a $OUTPUT/conf-zlib.log
+DESTDIR=$PKGD cmake --install build 2>&1 | tee -a $OUTPUT/install-zlib.log
+install -Dvm 0644 $FFBLD/zlib-$zlibver/build/libz.a -t $PKGD/usr/lib${LIBDIRSUFFIX}
+
+mkdir -pv $PKGD/doc/zlib-$zlibver
+cp -av LICENSE README zlib.3.pdf $PKGD/doc/zlib-$zlibver
+
+rm -vf $PKGD/usr/lib${LIBDIRSUFFIX}/*.la
+find $PKGD/usr/lib${LIBDIRSUFFIX} -name "*.so*" -exec rm -vf {} \+
+
+cd $FFBLD
+
+which cmake
+which ninja
+which meson
+
+# Building Xz and LZMA
+
+tar xvf $FFSRC/xz-5.6.2.tar.xz
+cd xz-5.6.2
+chown -R root:root .
+find . -perm 777 -exec chmod 755 {} \+
+find . -perm 664 -exec chmod 644 {} \+
+
+CPPFLAGS="-I$PKGD/usr/include" \
+CFLAGS="$SCFLAGS" \
+CXXFLAGS="$SCXXFLAGS" \
+LDFLAGS="-L$PKGD/usr/lib -L$PKGD/usr/lib64 $SLDFLAGS" \
+./configure --verbose \
+  --prefix=/usr \
+  --libdir=/usr/lib${LIBDIRSUFFIX} \
+  --bindir=/usr/bin \
+  --disable-shared \
+  --enable-static \
+  --enable-year2038  \
+  --docdir=/usr/doc/xz-$xzver \
+  --with-gnu-ld
+
+make -j$nprocr
+make install DESTDIR=$PKGD 2>&1 | tee -a $OUTPUT/install-${PRGNAM}-xz.log
+
+mkdir -pv $PKGD/doc/xz-$xzver
+mv -v $PKGD/usr/doc/xz-$xzver/*  $PKGD/doc/xz-$xzver
+
+rm -vf $PKGD/usr/lib${LIBDIRSUFFIX}/*.la
+find $PKGD/usr/lib${LIBDIRSUFFIX} -name "*.so*" -exec rm -vf {} \+
+
+cd $FFBLD
+
+# Building GMP  use libgmp instead of librtmp for rtmp protocol
+
+tar xvf $FFSRC/gmp-$gmpver.tar.xz
+cd gmp-$gmpver
+chown -R root:root .
+find . -perm 777 -exec chmod 755 {} \+
+find . -perm 664 -exec chmod 644 {} \+
+
+CPPFLAGS="-I$PKGD/usr/include" \
+CFLAGS="$SCFLAGS" \
+CXXFLAGS="$SCXXFLAGS" \
+LDFLAGS="-L$PKGD/usr/lib -L$PKGD/usr/lib64 $SLDFLAGS" \
+./configure \
+  --prefix=/usr \
+  --libdir=/usr/lib${LIBDIRSUFFIX} \
+  --bindir=/usr/bin \
+  --docdir=/usr/doc/gmp-$gmpver \
+  --enable-cxx  \
+  --disable-shared \
+  --enable-static \
+  --with-gnu-ld
+
+make -j$nprocr 2>&1 | tee -a $OUTPUT/conf-gmp.log
+make install DESTDIR=$PKGD 2>&1 | tee -a $OUTPUT/install-gmp.log
+
+mkdir -pv $PKGD/doc/gmp-$gmpver
+cp -av AUTHORS COPYING.LESSERv3 COPYINGv2 COPYINGv3 -pv $PKGD/doc/gmp-$gmpver
+
+rm -vf $PKGD/usr/lib${LIBDIRSUFFIX}/*.la
+find $PKGD/usr/lib${LIBDIRSUFFIX} -name "*.so*" -exec rm -vf {} \+
+
+cd $FFBLD
+
+# Building expat
+
+tar xvf $FFSRC/expat-$expver.tar.xz
+cd expat-$expver
+chown -R root:root .
+find . -perm 777 -exec chmod 755 {} \+
+find . -perm 664 -exec chmod 644 {} \+
+
+[ ! -x configure ] && autoreconf -fiv
+CPPFLAGS="-I$PKGD/usr/include" \
+CFLAGS="$SCFLAGS" \
+CXXFLAGS="$SCXXFLAGS" \
+LDFLAGS="-L$PKGD/usr/lib -L$PKGD/usr/lib64 $SLDFLAGS" \
+./configure \
+  --prefix=/usr \
+  --libdir=/usr/lib${LIBDIRSUFFIX} \
+  --bindir=/usr/bin \
+  --sysconfdir=/etc \
+  --localstatedir=/var \
+  --mandir=/usr/man \
+  --docdir=/usr/doc/libexpat-$expver \
+  --enable-static \
+  --disable-shared
+
+make -j$nprocr 2>&1 | tee -a $OUTPUT/conf-expat.log
+make install DESTDIR=$PKGD 2>&1 | tee -a $OUTPUT/install-expat.log
+
+mkdir -pv $PKGD/doc/expat-$expver
+cp -av COPYING AUTHORS   $PKGD/doc/expat-$expver
+
+rm -vf $PKGD/usr/lib${LIBDIRSUFFIX}/*.la
+find $PKGD/usr/lib${LIBDIRSUFFIX} -name "*.so*" -exec rm -vf {} \+
+
+cd $FFBLD
+
+# Building zimg
+
+tar xvf $FFSRC/zimg-3.0.5.tar.gz
+cd zimg-release-3.0.5
+chown -R root:root .
+find . -perm 777 -exec chmod 755 {} \+
+find . -perm 664 -exec chmod 644 {} \+
+
+./autogen.sh
+CPPFLAGS="-I$PKGD/usr/include" \
+CFLAGS="$SCFLAGS" \
+CXXFLAGS="$SCXXFLAGS" \
+LDFLAGS=" -L$PKGD/usr/lib -L$PKGD/usr/lib64 $SLDFLAGS" \
+./configure \
+  --prefix=/usr \
+  --libdir=/usr/lib${LIBDIRSUFFIX} \
+  --sysconfdir=/etc \
+  --localstatedir=/var \
+  --mandir=/usr/man \
+  --docdir=/usr/doc/zimg \
+  --enable-static=yes \
+  --enable-shared=no
+
+make -j$nprocr 2>&1 | tee -a $OUTPUT/make-zimg.log
+make install DESTDIR=$PKGD 2>&1 | tee -a $OUTPUT/install-zimg.log
+
+mkdir -pv $PKGD/doc/zimg
+cp -av COPYING README.md $PKGD/doc/zimg
+
+rm -vf $PKGD/usr/lib${LIBDIRSUFFIX}/*.la
+find $PKGD/usr/lib${LIBDIRSUFFIX} -name "*.so*" -exec rm -vf {} \+
+
+cd $FFBLD
+
+# Building libdrm
+
+tar xvf $FFSRC/libdrm-$drmver.tar.xz
+cd libdrm-$drmver
+chown -R root:root .
+find . -perm 777 -exec chmod 755 {} \+
+find . -perm 664 -exec chmod 644 {} \+
+
+CFLAGS="-I$PKGD/usr/include $SCFLAGS" \
+CXXFLAGS="-I$PKGD/usr/include $SCXXFLAGS" \
+LDFLAGS="-L$PKGD/usr/lib64 -L$PKGD/usr/lib $SLDFLAGS" meson build \
+    -Dprefix=/usr \
+    -Dlibdir=/usr/lib${LIBDIRSUFFIX} \
+    -Dlocalstatedir=/var \
+    -Dmandir=/usr/man \
+    -Dsysconfdir=/etc \
+    -Dincludedir=/usr/include \
+    -Ddatadir=/usr/share \
+    -Dsbindir=/usr/sbin \
+    -Dlibexecdir=/usr/libexec \
+    -Ddefault_library=static \
+    -Dbuildtype=release \
+    -Dstrip=true \
+    -Dudev=true \
+    -Dintel=enabled \
+    -Dtests=false \
+    -Dvalgrind=disabled \
+    -Dman-pages=disabled \
+    -Dcairo-tests=disabled
+
+ninja -j$nprocr -C build 2>&1 | tee $OUTPUT/make-libdrm.log
+DESTDIR=$PKGD ninja -C build  install 2>&1 | tee $OUTPUT/install-libdrm.log
+
+mkdir -pv $PKGD/doc/libdrm-$drmver
+cp -av README.rst CONTRIBUTING.rst $PKGD/doc/libdrm-$drmver
+
+rm -vf $PKGD/usr/lib${LIBDIRSUFFIX}/*.la
+find $PKGD/usr/lib${LIBDIRSUFFIX} -name "*.so*" -exec rm -vf {} \+
+
+cd $FFBLD
+
+# Building libva
+
+tar xvf $FFSRC/libva-$vaaver.tar.gz
+cd libva-$vaaver
+chown -R root:root .
+find . -perm 777 -exec chmod 755 {} \+
+find . -perm 664 -exec chmod 644 {} \+
+
+./autogen.sh
+CPPFLAGS="-I$PKGD/usr/include" \
+CFLAGS="$SCFLAGS" \
+CXXFLAGS="$SCXXFLAGS" \
+LDFLAGS="-L$PKGD/usr/lib -L$PKGD/usr/lib64 $SLDFLAGS" \
+./configure \
+  --prefix=/usr \
+  --libdir=/usr/lib${LIBDIRSUFFIX} \
+  --bindir=/usr/bin \
+  --sysconfdir=/etc \
+  --localstatedir=/var \
+  --mandir=/usr/man \
+  --enable-static=yes \
+  --enable-shared=no \
+  --enable-drm \
+  --enable-x11 \
+  --enable-glx \
+  --enable-wayland \
+  --with-gnu-ld
+
+make -j$nprocr 2>&1 | tee $OUTPUT/make-libva.log
+make install DESTDIR=$PKGD 2>&1 | tee $OUTPUT/install-libva.log
+
+mkdir -pv $PKGD/doc/libva-$vaaver
+cp -av COPYING README.md $PKGD/doc/libva-$vaaver
+
+rm -vf $PKGD/usr/lib${LIBDIRSUFFIX}/*.la
+find $PKGD/usr/lib${LIBDIRSUFFIX} -name "*.so*" -exec rm -vf {} \+
+
+cd $FFBLD
+
+# Building libvpl
+
+tar xvf $FFSRC/libvpl-$vplver.tar.gz
+cd libvpl-$vplver
+chown -R root:root .
+find . -perm 777 -exec chmod 755 {} \+
+find . -perm 664 -exec chmod 644 {} \+
+
+cmake -B build -S $FFBLD/libvpl-$vplver \
+    -DCMAKE_C_FLAGS:STRING="-I$PKGD/usr/include $SCFLAGS" \
+    -DCMAKE_CXX_FLAGS:STRING="-I$PKGD/usr/include $SCXXFLAGS" \
+    -DCMAKE_C_FLAGS_RELEASE:STRING="-I$PKGD/usr/include $SCFLAGS" \
+    -DCMAKE_CXX_FLAGS_RELEASE:STRING="-I$PKGD/usr/include $SCXXFLAGS" \
+    -DCMAKE_EXE_LINKER_FLAGS="-L$PKGD/usr/lib -L$PKGD/usr/lib64 $SLDFLAGS"  \
+    -DCMAKE_INSTALL_PREFIX=/usr \
+    -DCMAKE_INSTALL_LIBDIR=/usr/lib${LIBDIRSUFFIX} \
+    -DCMAKE_INSTALL_BINDIR=/usr/bin \
+    -DCMAKE_INSTALL_FULL_INCLUDEDIR=/usr/include \
+    -DVPL_INSTALL_FULL_PKGCONFIGDIR=/usr/lib${LIBDIRSUFFIX}/pkgconfig \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DBUILD_SHARED_LIBS=OFF \
+    -DINSTALL_DEV=ON \
+    -DINSTALL_LIB=ON \
+    -DBUILD_EXAMPLES=OFF
+
+cmake --build build --parallel $nprocr 2>&1 | tee -a $OUTPUT/make-libvpl.log
+DESTDIR=$PKGD cmake --install build 2>&1 | tee -a $OUTPUT/install-libvpl.log
+
+mkdir -pv $PKGD/doc/libvpl
+cp -av LICENSE README.md README.md $PKGD/doc/libvpl
+
+rm -vf $PKGD/usr/lib${LIBDIRSUFFIX}/*.la
+find $PKGD/usr/lib${LIBDIRSUFFIX} -name "*.so*" -exec rm -vf {} \+
+
+cd $FFBLD
+
+# Building libmicrohttpd
+
+tar xvf $FFSRC/libmicrohttpd-0.9.75.tar.gz
+cd libmicrohttpd-0.9.75
+chown -R root:root .
+find . -perm 777 -exec chmod 755 {} \+
+find . -perm 664 -exec chmod 644 {} \+
+CPPFLAGS="-I$PKGD/usr/include" \
+CFLAGS="$SCFLAGS" \
+CXXFLAGS="$SCXXFLAGS" \
+LDFLAGS=" -L$PKGD/usr/lib -L$PKGD/usr/lib64 $SLDFLAGS" \
+./configure \
+  --prefix=/usr \
+  --libdir=/usr/lib${LIBDIRSUFFIX} \
+  --mandir=/usr/man \
+  --infodir=/usr/info \
+  --sysconfdir=/etc \
+  --localstatedir=/var \
+  --enable-static=yes \
+  --enable-shared=no \
+  --disable-nls \
+  --disable-doc \
+  --disable-examples \
+  --disable-heavy-tests \
+  --enable-itc=pipe \
+  --disable-https \
+  --disable-coverage \
+  --disable-asserts \
+  --disable-sanitizers \
+  --disable-experimental \
+  --with-threads=posix
+  2>&1 | tee $OUTPUT/configure-microhttpd.log
+
+make -j$nprocr 2>&1 | tee $OUTPUT/make-microhttpd.log
+make install DESTDIR=$PKGD 2>&1 | tee $OUTPUT/install-microhttpd.log
+
+mkdir -pv $PKGD/doc/microhttpd
+cp -av AUTHORS COPYING $PKGD/doc/microhttpd
+
+rm -vf $PKGD/usr/lib${LIBDIRSUFFIX}/*.la
+find $PKGD/usr/lib${LIBDIRSUFFIX} -name "*.so*" -exec rm -vf {} \+
+
+cd $FFBLD
+
+# Building librist
+
+tar xvf $FFSRC/librist-v0.2.11.tar.gz
+cd librist-v0.2.11
+chown -R root:root .
+find . -perm 777 -exec chmod 755 {} \+
+find . -perm 664 -exec chmod 644 {} \+
+
+mkdir build
+
+CFLAGS="-I$PKGD/usr/include $SCFLAGS" \
+CXXFLAGS="-I$PKGD/usr/include $SCXXFLAGS" \
+LDFLAGS="-L$PKGD/usr/lib64 -L$PKGD/usr/lib $SLDFLAGS"
+PKG_CONFIG_PATH="$PKGD/usr/lib64/pkgconfig:$PKGD/usr/lib/pkgconfig:/opt/lib64/pkgconfig" meson setup build $FFBLD/librist-v0.2.11 \
+    -Dprefix=/usr \
+    -Dlibdir=/usr/lib${LIBDIRSUFFIX} \
+    -Dlocalstatedir=/var \
+    -Dmandir=/usr/man \
+    -Dsysconfdir=/etc \
+    -Dincludedir=/usr/include \
+    -Ddatadir=/usr/share \
+    -Dsbindir=/usr/sbin \
+    -Dlibexecdir=/usr/libexec \
+    -Ddefault_library=static \
+    -Dbuildtype=release \
+    -Dstrip=true \
+    -Dtest=false \
+    -Dbuiltin_mbedtls=true \
+    -Dbuiltin_cjson=true \
+    -Dallow_obj_filter=true 2>&1 | tee $OUTPUT/configure-rist.log
+
+meson compile -C build 2>&1 | tee $OUTPUT/make-rist.log
+meson install -C build --destdir=$PKGD 2>&1 | tee $OUTPUT/install-rist.log
+
+mkdir -pv $PKGD/doc/rist
+cp -av COPYING THANKS.md README.md $PKGD/doc/rist
+
+rm -vf $PKGD/usr/lib${LIBDIRSUFFIX}/*.la
+find $PKGD/usr/lib${LIBDIRSUFFIX} -name "*.so*" -exec rm -vf {} \+
+
+cd $FFBLD
+
+# Building libcryptopp
+
+tar xvf $FFSRC/cryptopp-CRYPTOPP_8_9_0.tar.gz
+cd cryptopp-CRYPTOPP_8_9_0
+chown -R root:root .
+find . -perm 777 -exec chmod 755 {} \+
+find . -perm 664 -exec chmod 644 {} \+
+
+# Cater to 64-bit Slackware:
+sed -i -e "s,(PREFIX)/lib,(PREFIX)/lib${LIBDIRSUFFIX},g" GNUmakefile
+
+make static libcryptopp.pc -j$nprocr CXXFLAGS="${SCXXFLAGS} -DNDEBUG" LDFLAGS="${SLDFLAGS}"
+make install PREFIX=$PKGD/usr
+
+# Fix the installed pkg-config file:
+sed -i $PKGD/usr/lib${LIBDIRSUFFIX}/pkgconfig/libcryptopp.pc -e "s,/usr/local,/usr,g"
+sed -i 's|^libdir=.*|libdir=${prefix}/lib64|' $PKGD/usr/lib64/pkgconfig/libcryptopp.pc
+
+mkdir -pv $PKGD/doc/cryptopp
+cp -av License.txt $PKGD/doc/cryptopp
+
+rm -vf $PKGD/usr/lib${LIBDIRSUFFIX}/*.la
+find $PKGD/usr/lib${LIBDIRSUFFIX} -name "*.so*" -exec rm -vf {} \+
+
+cd $FFBLD
+
+# Building kvazaar
+
+tar xvf $FFSRC/kvazaar-2.3.1.tar.gz
+cd kvazaar-2.3.1
+chown -R root:root .
+find . -perm 777 -exec chmod 755 {} \+
+find . -perm 664 -exec chmod 644 {} \+
+CPPFLAGS="-I$PKGD/usr/include" \
+CFLAGS="$SCFLAGS" \
+CXXFLAGS="$SCXXFLAGS" \
+LDFLAGS=" -L$PKGD/usr/lib -L$PKGD/usr/lib64 $SLDFLAGS" \
+autoreconf -fiv
+./configure \
+  --prefix=/usr \
+  --libdir=/usr/lib${LIBDIRSUFFIX} \
+  --bindir=/usr/bin \
+  --sysconfdir=/etc \
+  --localstatedir=/var \
+  --mandir=/usr/man \
+  --docdir=/usr/doc/kvazaar \
+  --enable-shared=no \
+  --enable-static=yes \
+  --with-cryptopp \
+  --with-gnu-ld 2>&1 | tee $OUTPUT/configure-kvazaar.log
+
+make -j$nprocr 2>&1 | tee $OUTPUT/make-kvazaar.log
+make install DESTDIR=$PKGD 2>&1 | tee $OUTPUT/install-kvazaar.log
+
+mkdir -pv $PKGD/doc/kvazaar
+cp -av CREDITS LICENSE LICENSE.EXT.greatest $PKGD/doc/kvazaar
+
+rm -vf $PKGD/usr/lib${LIBDIRSUFFIX}/*.la
+find $PKGD/usr/lib${LIBDIRSUFFIX} -name "*.so*" -exec rm -vf {} \+
+
+cd $FFBLD
+
+# Building libvvenc
+
+tar xvf $FFSRC/vvenc-1.13.0.tar.gz
+cd vvenc-1.13.0
+chown -R root:root .
+find . -perm 777 -exec chmod 755 {} \+
+find . -perm 664 -exec chmod 644 {} \+
+
+cmake -B build -S $FFBLD/vvenc-1.13.0 -G 'Unix Makefiles' \
+    -DCMAKE_C_FLAGS:STRING="-I$PKGD/usr/include -I/opt/usr/include $SCFLAGS" \
+    -DCMAKE_CXX_FLAGS:STRING="-I$PKGD/usr/include -I/opt/usr/include $SCXXFLAGS" \
+    -DCMAKE_C_FLAGS_RELEASE:STRING="-I$PKGD/usr/include -I/opt/usr/include $SCFLAGS" \
+    -DCMAKE_CXX_FLAGS_RELEASE:STRING="-I$PKGD/usr/include -I/opt/usr/include $SCXXFLAGS" \
+    -DCMAKE_EXE_LINKER_FLAGS="-L$PKGD/usr/lib -L$PKGD/usr/lib64 -L/opt/lib64 $SLDFLAGS"  \
+    -DCMAKE_INSTALL_PREFIX=/usr \
+    -DCMAKE_INSTALL_BINDIR=/usr/bin \
+    -DCMAKE_INSTALL_LIBDIR=/usr/lib${LIBDIRSUFFIX} \
+    -DCMAKE_INSTALL_DATADIR=/usr/share \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DVVENC_INSTALL_FULLFEATURE_APP:BOOL=ON \
+    -DBUILD_SHARED_LIBS:BOOL=OFF \
+    -DVVENC_ENABLE_LINK_TIME_OPT=OFF \
+    -DVVENC_USE_THREAD_SANITIZER=OFF \
+    -DVVENC_USE_ADDRESS_SANITIZER=OFF \
+    -DVVENC_ENABLE_TRACING=OFF \
+    -DVVENC_ENABLE_THIRDPARTY_JSON:BOOL=OFF 2>&1 | tee -a $OUTPUT/configure-vvenc.log
+
+cmake --build build 2>&1 | tee -a $OUTPUT/make-vvenc.log
+DESTDIR=$PKGD cmake --install build 2>&1 | tee -a $OUTPUT/install-vvenc.log
+
+mkdir -pv $PKGD/doc/vvenc
+cp -av AUTHORS.md LICENSE.txt README.md $PKGD/doc/vvenc
+
+rm -vf $PKGD/usr/lib${LIBDIRSUFFIX}/*.la
+find $PKGD/usr/lib${LIBDIRSUFFIX} -name "*.so*" -exec rm -vf {} \+
+
+cd $FFBLD
+
+#Building aribb24
+
+tar xvf $FFSRC/aribb24-$arbver.tar.gz
+cd aribb24-$arbver
+chown -R root:root .
+find . -perm 777 -exec chmod 755 {} \+
+find . -perm 664 -exec chmod 644 {} \+
+
+CPPFLAGS="-I$PKGD/usr/include" \
+CFLAGS="$SCFLAGS" \
+CXXFLAGS="$SCXXFLAGS" \
+LDFLAGS="-L$PKGD/usr/lib -L$PKGD/usr/lib64 $SLDFLAGS" \
+./bootstrap
+./configure \
+  --prefix=/usr \
+  --libdir=/usr/lib${LIBDIRSUFFIX} \
+  --bindir=/usr/bin \
+  --sysconfdir=/etc \
+  --localstatedir=/var \
+  --mandir=/usr/man \
+  --docdir=/usr/doc/aribb24-$arbver \
+  --enable-static \
+  --disable-shared
+
+make -j$nprocr 2>&1 | tee -a $OUTPUT/conf-aribb24.log
+make install DESTDIR=$PKGD 2>&1 | tee -a $OUTPUT/install-aribb24.log
+
+mkdir -pv $PKGD/doc/aribb24-$arbver
+mv -v $PKGD/usr/doc/aribb24-$arbver/* $PKGD/doc/aribb24-$arbver
+
+rm -vf $PKGD/usr/lib${LIBDIRSUFFIX}/*.la
+find $PKGD/usr/lib${LIBDIRSUFFIX} -name "*.so*" -exec rm -vf {} \+
+
+cd $FFBLD
+
+# Building aribcaption
+
+tar xvf $FFSRC/libaribcaption-$arbcver.tar.gz
+cd libaribcaption-$arbcver
+chown -R root:root .
+find . -perm 777 -exec chmod 755 {} \+
+find . -perm 664 -exec chmod 644 {} \+
+
+cmake -B build -S $FFBLD/libaribcaption-$arbcver -G 'Unix Makefiles' \
+    -DCMAKE_C_FLAGS:STRING="-I$PKGD/usr/include $SCFLAGS" \
+    -DCMAKE_CXX_FLAGS:STRING="-I$PKGD/usr/include $SCXXFLAGS" \
+    -DCMAKE_C_FLAGS_RELEASE:STRING="-I$PKGD/usr/include $SCFLAGS" \
+    -DCMAKE_CXX_FLAGS_RELEASE:STRING="-I$PKGD/usr/include $SCXXFLAGS" \
+    -DCMAKE_EXE_LINKER_FLAGS="-L$PKGD/usr/lib -L$PKGD/usr/lib64 $SLDFLAGS"  \
+    -DCMAKE_INSTALL_PREFIX=/usr \
+    -DCMAKE_INSTALL_LIBDIR=/usr/lib${LIBDIRSUFFIX} \
+    -DCMAKE_INSTALL_BINDIR=/usr/bin \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DARIBCC_USE_CORETEXT:BOOL=OFF \
+    -DARIBCC_SHARED_LIBRARY:BOOL=OFF \
+    -DARIBCC_IS_ANDROID:BOOL=FALSE \
+    -DARIBCC_USE_DIRECTWRITE:BOOL=OFF \
+    -DARIBCC_NO_RENDERER:BOOL=OFF
+
+cmake --build build --parallel $nprocr 2>&1 | tee -a $OUTPUT/make-aribcaption.log
+DESTDIR=$PKGD cmake --install build 2>&1 | tee -a $OUTPUT/install-aribcaption.log
+
+mkdir -pv $PKGD/doc/libaribcaption-$aribcver
+cp -av LICENSE README.md  $PKGD/doc/libaribcaption-$aribcver
+
+rm -vf $PKGD/usr/lib${LIBDIRSUFFIX}/*.la
+find $PKGD/usr/lib${LIBDIRSUFFIX} -name "*.so*" -exec rm -vf {} \+
+
+cd $FFBLD
+
+# Building libfdk-aac
+
+tar xvf $FFSRC/fdk-aac-$fdkver.tar.gz
+cd fdk-aac-$fdkver
+chown -R root:root .
+find . -perm 777 -exec chmod 755 {} \+
+find . -perm 664 -exec chmod 644 {} \+
+
+autoreconf -fiv
+CPPFLAGS="-I$PKGD/usr/include" \
+CFLAGS="$SCFLAGS" \
+CXXFLAGS="$SCXXFLAGS" \
+LDFLAGS="-L$PKGD/usr/lib -L$PKGD/usr/lib64 $SLDFLAGS" \
+./configure \
+  --prefix=/usr \
+  --enable-static \
+  --disable-shared \
+  --libdir=/usr/lib${LIBDIRSUFFIX} \
+  --sysconfdir=/etc \
+  --localstatedir=/var \
+  --docdir=/doc/fdk-aac-$fdkver \
+  --build=$ARCH-slackware-linux
+
+make -j$nprocr 2>&1 | tee $OUTPUT/conf-fdk.log
+make install DESTDIR=$PKGD 2>&1 | tee $OUTPUT/install-fdk.log
+
+mkdir -pv $PKGD/doc/fdk-aac-$fdkver
+cp -av ChangeLog NOTICE documentation/*.pdf $PKGD/doc/fdk-aac-$fdkver
+
+rm -vf $PKGD/usr/lib${LIBDIRSUFFIX}/*.la
+find $PKGD/usr/lib${LIBDIRSUFFIX} -name "*.so*" -exec rm -vf {} \+
+
+cd $FFBLD
+
+# Building opencore-amr
+
+tar xvf $FFSRC/opencore-amr-$amrver.tar.gz
+cd opencore-amr-$amrver
+chown -R root:root .
+find . -perm 777 -exec chmod 755 {} \+
+find . -perm 664 -exec chmod 644 {} \+
+
+CPPFLAGS="-I$PKGD/usr/include" \
+CFLAGS="$SCFLAGS" \
+CXXFLAGS="$SCXXFLAGS" \
+LDFLAGS="-L$PKGD/usr/lib -L$PKGD/usr/lib64 $SLDFLAGS" \
+./configure \
+  --prefix=/usr \
+  --libdir=/usr/lib${LIBDIRSUFFIX} \
+  --mandir=/usr/man \
+  --localstatedir=/var \
+  --sysconfdir=/etc \
+  --disable-shared \
+  --enable-static
+
+make -j$nprocr 2>&1 | tee $OUTPUT/make-amr.log
+make install DESTDIR=$PKGD 2>&1 | tee $OUTPUT/install-amr.log
+
+mkdir -pv $PKGD/doc/opencore-amr-$amrver
+cp -av  LICENSE README $PKGD/doc/opencore-amr-$amrver
+
+rm -vf $PKGD/usr/lib${LIBDIRSUFFIX}/*.la
+find $PKGD/usr/lib${LIBDIRSUFFIX} -name "*.so*" -exec rm -vf {} \+
+
+cd $FFBLD
+
+# Building vo-amrwbenc
+
+tar xvf $FFSRC/vo-amrwbenc-$voamrver.tar.gz
+cd vo-amrwbenc-$voamrver
+chown -R root:root .
+find . -perm 777 -exec chmod 755 {} \+
+find . -perm 664 -exec chmod 644 {} \+
+
+CPPFLAGS="-I$PKGD/usr/include" \
+CFLAGS="$SCFLAGS" \
+CXXFLAGS="$SCXXFLAGS" \
+LDFLAGS="-L$PKGD/usr/lib -L$PKGD/usr/lib64 $SLDFLAGS" \
+./configure \
+  --prefix=/usr \
+  --libdir=/usr/lib${LIBDIRSUFFIX} \
+  --bindir=/usr/bin \
+  --enable-static \
+  --docdir=/doc/vo-amrwbenc-$voamrver\
+  --enable-example \
+  --disable-shared
+
+make -j$nprocr 2>&1 | tee $OUTPUT/make-voamr.log
+make install DESTDIR=$PKGD 2>&1 | tee $OUTPUT/install-voamr.log
+
+mkdir -pv $PKGD/doc/vo-amrwbenc-$voamrver
+cp -av COPYING NOTICE README  $PKGD/doc/vo-amrwbenc-$voamrver
+
+rm -vf $PKGD/usr/lib${LIBDIRSUFFIX}/*.la
+find $PKGD/usr/lib${LIBDIRSUFFIX} -name "*.so*" -exec rm -vf {} \+
+
+cd $FFBLD
+
+# Building  Brotli
+
+tar xvf $FFSRC/brotli-$brotver.tar.gz
+cd brotli-$brotver
+chown -R root:root .
+find . -perm 777 -exec chmod 755 {} \+
+find . -perm 664 -exec chmod 644 {} \+
+
+cmake -B build -S $FFBLD/brotli-$brotver  \
+    -DCMAKE_C_FLAGS:STRING="-I$PKGD/usr/include $SCFLAGS" \
+    -DCMAKE_CXX_FLAGS:STRING="-I$PKGD/usr/include $SCXXFLAGS" \
+    -DCMAKE_C_FLAGS_RELEASE:STRING="-I$PKGD/usr/include $SCFLAGS" \
+    -DCMAKE_CXX_FLAGS_RELEASE:STRING="-I$PKGD/usr/include $SCXXFLAGS" \
+    -DCMAKE_EXE_LINKER_FLAGS="-L$PKGD/usr/lib -L$PKGD/usr/lib64 $SLDFLAGS"  \
+    -DCMAKE_INSTALL_PREFIX=/usr \
+    -DCMAKE_INSTALL_LIBDIR=/usr/lib${LIBDIRSUFFIX} \
+    -DMAN_INSTALL_DIR=/usr/man \
+    -DSYSCONF_INSTALL_DIR=/etc \
+    -DLIB_SUFFIX=${LIBDIRSUFFIX} \
+    -DBUILD_TESTING=NO \
+    -DBUILD_SHARED_LIBS:BOOL=OFF \
+    -DCMAKE_BUILD_TYPE=Release
+
+cmake --build build --parallel $nprocr 2>&1 | tee $OUTPUT/make-brotli.log
+DESTDIR=$PKGD cmake --install build 2>&1 | tee $OUTPUT/install-brotli.log
+
+mkdir -pv $PKGD/doc/brotli-$brotver
+cp -av  BUILD* CONTRIBUTING* LICENSE* README* $PKGD/doc/brotli-$brotver
+
+rm -vf $PKGD/usr/lib${LIBDIRSUFFIX}/*.la
+find $PKGD/usr/lib${LIBDIRSUFFIX} -name "*.so*" -exec rm -vf {} \+
+
+cd $FFBLD
+
+# Building LAME
+
+tar xvf $FFSRC/lame-$lamever.tar.gz
+cd lame-$lamever
+chown -R root:root .
+find . -perm 777 -exec chmod 755 {} \+
+find . -perm 664 -exec chmod 644 {} \+
+
+CPPFLAGS="-I$PKGD/usr/include" \
+CFLAGS="$SCFLAGS" \
+CXXFLAGS="$SCXXFLAGS" \
+LDFLAGS="-L$PKGD/usr/lib -L$PKGD/usr/lib64 $SLDFLAGS" \
+./configure \
+  --prefix=/usr \
+  --libdir=/usr/lib${LIBDIRSUFFIX} \
+  --enable-static \
+  --disable-shared
+
+make -j$nprocr  2>&1 | tee $OUTPUT/make-lame.log
+make install DESTDIR=$PKGD 2>&1 | tee -a $OUTPUT/install-lame.log
+
+mkdir -pv $PKGD/doc/lame-$lamever
+cp -a COPYING LICENSE README $PKGD/doc/lame-$lamever || true
+
+rm -vf $PKGD/usr/lib${LIBDIRSUFFIX}/*.la
+find $PKGD/usr/lib${LIBDIRSUFFIX} -name "*.so*" -exec rm -vf {} \+
+
+cd $FFBLD
+
+# Building libjpeg-turbo
+
+tar xvf $FFSRC/libjpeg-turbo-$jptver.tar.gz
+cd libjpeg-turbo-$jptver
+chown -R root:root .
+find . -perm 777 -exec chmod 755 {} \+
+find . -perm 664 -exec chmod 644 {} \+
+
+cmake -B build -S $FFBLD/libjpeg-turbo-$jptver -G "Unix Makefiles" \
+    -DCMAKE_C_FLAGS:STRING="-I$PKGD/usr/include $SCFLAGS" \
+    -DCMAKE_CXX_FLAGS:STRING="-I$PKGD/usr/include $SCXXFLAGS" \
+    -DCMAKE_C_FLAGS_RELEASE:STRING="-I$PKGD/usr/include $SCFLAGS" \
+    -DCMAKE_CXX_FLAGS_RELEASE:STRING="-I$PKGD/usr/include $SCXXFLAGS" \
+    -DCMAKE_EXE_LINKER_FLAGS="-L$PKGD/usr/lib -L$PKGD/usr/lib64 $SLDFLAGS"  \
+    -DCMAKE_INSTALL_PREFIX=/usr \
+    -DCMAKE_INSTALL_LIBDIR=/usr/lib${LIBDIRSUFFIX} \
+    -DCMAKE_INSTALL_BINDIR=/usr/bin \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DWITH_JPEG7=1 \
+    -DWITH_JPEG8=1 \
+    -DWITH_TURBOJPEG=TRUE \
+    -DWITH_ARITH_ENC=1 \
+    -DWITH_ARITH_DEC=1 \
+    -DWITH_JAVA=0 \
+    -DENABLE_SHARED=FALSE \
+    -DENABLE_STATIC=TRUE
+
+cmake --build build --parallel $nprocr 2>&1 | tee -a $OUTPUT/make-jpegturbo.log
+DESTDIR=$PKGD cmake --install build 2>&1 | tee -a $OUTPUT/install-jpegturbo.log
+
+mkdir -pv $PKGD/doc/libjpeg-turbo-$jptver
+cp -av LICENSE.md README.ijg README.md $PKGD/doc/libjpeg-turbo-$jptver
+
+rm -vf $PKGD/usr/lib${LIBDIRSUFFIX}/*.la
+find $PKGD/usr/lib${LIBDIRSUFFIX} -name "*.so*" -exec rm -vf {} \+
+
+cd $FFBLD
+
+# Building libtiff
+
+tar xvf $FFSRC/tiff-$tiffver.tar.xz
+cd tiff-$tiffver
+chown -R root:root .
+find . -perm 777 -exec chmod 755 {} \+
+find . -perm 664 -exec chmod 644 {} \+
+
+CPPFLAGS="-I$PKGD/usr/include" \
+CFLAGS="$SCFLAGS" \
+CXXFLAGS="$SCXXFLAGS" \
+LDFLAGS="-L$PKGD/usr/lib -L$PKGD/usr/lib64 $SLDFLAGS" \
+./configure \
+  --prefix=/usr \
+  --libdir=/usr/lib${LIBDIRSUFFIX} \
+  --bindir=/usr/bin \
+  --disable-shared \
+  --enable-static \
+  --enable-cxx  \
+  --disable-tests \
+  --disable-docs \
+  --disable-pixarlog \
+  --disable-libdeflate  \
+  --disable-old-jpeg \
+  --disable-jbig \
+  --disable-lerc \
+  --disable-webp \
+  --disable-sphinx \
+  --with-gnu-ld
+
+make -j$nprocr 2>&1 | tee -a $OUTPUT/make-tiff.log
+make install DESTDIR=$PKGD 2>&1 | tee -a $OUTPUT/install-tiff.log
+
+mkdir -pv $PKGD/doc/tiff-$tiffver
+cp -av LICENSE.md README.md $PKGD/doc/tiff-$tiffver
+
+rm -vf $PKGD/usr/lib${LIBDIRSUFFIX}/*.la
+find $PKGD/usr/lib${LIBDIRSUFFIX} -name "*.so*" -exec rm -vf {} \+
+
+cd $FFBLD
+
+# Building libpng
+
+tar xvf $FFSRC/libpng-$pngver.tar.xz
+cd libpng-$pngver
+chown -R root:root .
+find . -perm 777 -exec chmod 755 {} \+
+find . -perm 664 -exec chmod 644 {} \+
+
+gzip -cd $FFSRC/libpng-$apngver-apng.patch.gz | patch -p1 --verbose
+
+CPPFLAGS="-I$PKGD/usr/include" \
+CFLAGS="$SCFLAGS" \
+CXXFLAGS="$SCXXFLAGS" \
+LDFLAGS="-L$PKGD/usr/lib -L$PKGD/usr/lib64 $SLDFLAGS" \
+./configure \
+  --prefix=/usr \
+  --libdir=/usr/lib${LIBDIRSUFFIX} \
+  --bindir=/usr/bin \
+  --disable-shared \
+  --enable-static \
+  --disable-tests \
+  --enable-intel-sse \
+  --with-zlib-prefix=$PKGD/usr \
+  --with-gnu-ld
+
+make -j$nprocr 2>&1 | tee -a $OUTPUT/make-png.log
+make install DESTDIR=$PKGD 2>&1 | tee -a $OUTPUT/install-png.log
+
+mkdir -pv $PKGD/doc/png-$pngver
+cp -av AUTHORS LICENSE README $PKGD/doc/png-$pngver
+
+rm -vf $PKGD/usr/lib${LIBDIRSUFFIX}/*.la
+find $PKGD/usr/lib${LIBDIRSUFFIX} -name "*.so*" -exec rm -vf {} \+
+
+cd $FFBLD
+
+# Building  SDL2 might need to build libsampletate before SDL
+
+tar xvf $FFSRC/SDL2-$sdlver.tar.gz
+cd SDL2-$sdlver
+chown -R root:root .
+find . -perm 777 -exec chmod 755 {} \+
+find . -perm 664 -exec chmod 644 {} \+
+
+CPPFLAGS="-I$PKGD/usr/include" \
+CFLAGS="$SCFLAGS" \
+CXXFLAGS="$SCXXFLAGS" \
+LDFLAGS="$SLDFLAGS -L$PKGD/usr/lib -L$PKGD/usr/lib64" \
+./autogen.sh
+./configure \
+  --prefix=/usr \
+  --libdir=/usr/lib${LIBDIRSUFFIX} \
+  --enable-static \
+  --disable-shared \
+
+make -j$nprocr  2>&1 | tee $OUTPUT/make-sdl2.log
+make install DESTDIR=$PKGD 2>&1 | tee $OUTPUT/install-sdl2.log
+
+mkdir -pv $PKGD/doc/sdl2-sdlver
+cp *.txt $PKGD/doc/sdl2-sdlver
+
+rm -vf $PKGD/usr/lib${LIBDIRSUFFIX}/*.la
+find $PKGD/usr/lib${LIBDIRSUFFIX} -name "*.so*" -exec rm -vf {} \+
+
+cd $FFBLD
+
+# Building libogg needed for libvorbis
+
+tar xvf $FFSRC/libogg-$oggver.tar.xz
+cd libogg-$oggver
+chown -R root:root .
+find . -perm 777 -exec chmod 755 {} \+
+find . -perm 664 -exec chmod 644 {} \+
+
+CPPFLAGS="-I$PKGD/usr/include" \
+CFLAGS="$SCFLAGS" \
+CXXFLAGS="$SCXXFLAGS" \
+LDFLAGS="$SLDFLAGS -L$PKGD/usr/lib -L$PKGD/usr/lib64" \
+./configure \
+  --prefix=/usr \
+  --libdir=/usr/lib${LIBDIRSUFFIX} \
+  --docdir=/usr/doc/libogg-$oggver \
+  --sysconfdir=/etc \
+  --localstatedir=/var \
+  --disable-shared \
+  --enable-static
+
+make -j$nprocr 2>&1 | tee $OUTPUT/make-libogg.log
+make install DESTDIR=$PKGD 2>&1 | tee $OUTPUT/install-libogg.log
+
+mkdir -pv $PKGD/doc/libogg-oggver
+cp -a AUTHORS CHANGES COPYING* README*  $PKGD/doc/libogg-oggver
+
+rm -vf $PKGD/usr/lib${LIBDIRSUFFIX}/*.la
+find $PKGD/usr/lib${LIBDIRSUFFIX} -name "*.so*" -exec rm -vf {} \+
+
+cd $FFBLD
+
+# Building libvorbis
+
+tar xvf $FFSRC/libvorbis-$vorbver.tar.xz
+cd libvorbis-$vorbver
+chown -R root:root .
+find . -perm 777 -exec chmod 755 {} \+
+find . -perm 664 -exec chmod 644 {} \+
+
+CPPFLAGS="-I$PKGD/usr/include" \
+CFLAGS="$SCFLAGS" \
+CXXFLAGS="$SCXXFLAGS" \
+LDFLAGS="$SLDFLAGS -L$PKGD/usr/lib -L$PKGD/usr/lib64" \
+./configure \
+  --prefix=/usr \
+  --libdir=/usr/lib${LIBDIRSUFFIX} \
+  --docdir=/usr/doc/libvorbis-$vorbver \
+  --sysconfdir=/etc \
+  --localstatedir=/var \
+  --disable-shared \
+  --enable-static
+
+make -j$nprocr 2>&1 | tee $OUTPUT/make-libvorbis.log
+make install DESTDIR=$PKGD 2>&1 | tee $OUTPUT/install-libvorbis.log
+
+mkdir -pv $PKGD/doc/libvorbis-$vorbver
+cp -a AUTHORS COPYING $PKGD/doc/libvorbis-$vorbver
+
+rm -vf $PKGD/usr/lib${LIBDIRSUFFIX}/*.la
+find $PKGD/usr/lib${LIBDIRSUFFIX} -name "*.so*" -exec rm -vf {} \+
+
+cd $FFBLD
+
+# Building libtheora
+
+tar xvf $FFSRC/libtheora-1.1.1.tar.bz2
+cd libtheora-$theover
+chown -R root:root .
+find . -perm 777 -exec chmod 755 {} \+
+find . -perm 664 -exec chmod 644 {} \+
+
+zcat $CWD/patches/libtheora-1.1.1-libpng16.patch.gz | patch -p0 --verbose || exit 1
+zcat $CWD/patches/libtheora-1.1.1.latex.patch.gz | patch -p1 --verbose || exit 1
+
+CPPFLAGS="-I$PKGD/usr/include" \
+CFLAGS="$SCFLAGS" \
+CXXFLAGS="$SCXXFLAGS" \
+LDFLAGS="$SLDFLAGS -L$PKGD/usr/lib -L$PKGD/usr/lib64" \
+./autogen.sh
+./configure \
+  --prefix=/usr \
+  --libdir=/usr/lib${LIBDIRSUFFIX} \
+  --docdir=/usr/doc/libvorbis-$vorbver \
+  --sysconfdir=/etc \
+  --localstatedir=/var \
+  --disable-shared \
+  --enable-static
+
+make -j$nprocr 2>&1 | tee $OUTPUT/make-libtheora.log
+make install DESTDIR=$PKGD 2>&1 | tee $OUTPUT/install-libtheora.log
+
+mkdir -pv $PKGD/doc/libtheora-$theover
+cp -a AUTHORS COPYING LICENSE README $PKGD/doc/libtheora-$theover
+
+rm -vf $PKGD/usr/lib${LIBDIRSUFFIX}/*.la
+find $PKGD/usr/lib${LIBDIRSUFFIX} -name "*.so*" -exec rm -vf {} \+
+
+cd $FFBLD
+
+# Building Speex
+
+tar xvf $FFSRC/speex-speex-$speexver.tar.gz
+cd speex-Speex-$speexver
+chown -R root:root .
+find . -perm 777 -exec chmod 755 {} \+
+find . -perm 664 -exec chmod 644 {} \+
+
+./autogen.sh
+CPPFLAGS="-I$PKGD/usr/include" \
+CFLAGS="$SCFLAGS" \
+CXXFLAGS="$SCXXFLAGS" \
+LDFLAGS="$SLDFLAGS -L$PKGD/usr/lib -L$PKGD/usr/lib64" \
+./configure \
+  --prefix=/usr \
+  --libdir=/usr/lib${LIBDIRSUFFIX} \
+  --docdir=/usr/doc/speex-$speexver \
+  --sysconfdir=/etc \
+  --localstatedir=/var \
+  --disable-shared \
+  --enable-static
+
+make -j$nprocr 2>&1 | tee $OUTPUT/make-speex.log
+make install DESTDIR=$PKGD 2>&1 | tee $OUTPUT/install-speex.log
+
+mkdir -pv $PKGD/doc/speex-$speexver
+cp -a AUTHORS COPYING README $PKGD/doc/speex-$speexver
+
+rm -vf $PKGD/usr/lib${LIBDIRSUFFIX}/*.la
+find $PKGD/usr/lib${LIBDIRSUFFIX} -name "*.so*" -exec rm -vf {} \+
+
+cd $FFBLD
+
+# Building Opus, Disable celt as it is merged with opus codec in FFmpeg
+
+tar xvf $FFSRC/opus-$opusver.tar.gz
+cd opus-$opusver
+chown -R root:root .
+find . -perm 777 -exec chmod 755 {} \+
+find . -perm 664 -exec chmod 644 {} \+
+
+CPPFLAGS="-I$PKGD/usr/include" \
+CFLAGS="$SCFLAGS" \
+CXXFLAGS="$SCXXFLAGS" \
+LDFLAGS="$SLDFLAGS -L$PKGD/usr/lib -L$PKGD/usr/lib64" \
+./configure \
+  --prefix=/usr \
+  --libdir=/usr/lib${LIBDIRSUFFIX} \
+  --docdir=/usr/doc/libvorbis-$vorbver \
+  --sysconfdir=/etc \
+  --localstatedir=/var \
+  --disable-shared \
+  --disable-doc  \
+  --enable-static \
+  --disable-hardening \
+  --disable-dot-product \
+  --enable-custom-modes \
+  --enable-dred \
+  --enable-deep-plc \
+  --enable-float-approx \
+  --enable-osce-training-datta \
+  --enable-osce \
+  --with-gnu-ld
+
+make -j$nprocr 2>&1 | tee $OUTPUT/make-opus.log
+make install DESTDIR=$PKGD 2>&1 | tee $OUTPUT/install-opus.log
+
+mkdir -pv $PKGD/doc/opus-$opusver
+cp -av COPYING AUTHORS README $PKGD/doc/opus-$opusver
+
+rm -vf $PKGD/usr/lib${LIBDIRSUFFIX}/*.la
+find $PKGD/usr/lib${LIBDIRSUFFIX} -name "*.so*" -exec rm -vf {} \+
+
+cd $FFBLD
+
+# Building libgsm
+
+tar xvf $FFSRC/gsm-$gsmver.tar.gz
+cd gsm-1.0-pl22
+chown -R root:root .
+find . -perm 777 -exec chmod 755 {} \+
+find . -perm 664 -exec chmod 644 {} \+
+
+# From SBo gsm slackbuild:
+#these sed's fix 64bit compiling (but will break 16bit compiling)
+#which is only relevant for DOS, so is ok here.
+sed -i 's/typedef long/typedef int/g' inc/private.h
+sed -i 's/typedef unsigned long/typedef unsigned int/g' inc/private.h
+
+# From AlienBob's FFmpeg slackbuild:
+sed -i -e "/^CCFLAGS/s,-O2 ,$SCFLAGS -I$PKGD/usr/include ," \
+       -e "s|^# LDFLAGS.*|LDFLAGS = $SLDFLAGS -L$PKGD/usr/lib -L$PKGD/usr/lib64|" Makefile
+
+
+make -j$nprocr 2>&1 | tee $OUTPUT/make-gsm.log
+make install DESTDIR=$PKGD 2>&1 | tee -a $OUTPUT/install-gsm.log
+
+mkdir -pv $PKGD/usr/include/gsm
+cp bin/* $PKGD/usr/bin/
+cp inc/* $PKGD/usr/include/gsm
+cp inc/gsm.h $PKGD/usr/include
+cp lib/* $PKGD/usr/lib64
+
+mkdir -pv $PKGD/doc/gsm-$gsmver
+cp -av COPYRIGHT README $PKGD/doc/gsm-$gsmver
+
+cd $FFBLD
+
+# Building libdvdnav
+
+tar xvf $FFSRC/libdvdnav-$dnaver.tar.bz2
+cd libdvdnav-$dnaver
+chown -R root:root .
+find . -perm 777 -exec chmod 755 {} \+
+find . -perm 664 -exec chmod 644 {} \+
+
+[ ! -x configure ] && ./autogen.sh
+CPPFLAGS="-I$PKGD/usr/include" \
+CFLAGS="$SCFLAGS" \
+CXXFLAGS="$SCXXFLAGS" \
+LDFLAGS="$SLDFLAGS -L$PKGD/usr/lib -L$PKGD/usr/lib64" \
+./configure \
+  --prefix=/usr \
+  --libdir=/usr/lib${LIBDIRSUFFIX} \
+  --docdir=/usr/doc/libdvdnav-$dnaver \
+  --sysconfdir=/etc \
+  --localstatedir=/var \
+  --disable-shared \
+  --enable-static
+
+make -j$nprocr 2>&1 | tee $OUTPUT/make-dvdnav.log
+make install DESTDIR=$PKGD 2>&1 | tee $OUTPUT/install-dvdnav.log
+
+mkdir -pv $PKGD/doc/libdvdnav-$dnaver
+cp -a AUTHORS COPYING* README* $PKGD/doc/libdvdnav-$dnaver
+
+rm -vf $PKGD/usr/lib${LIBDIRSUFFIX}/*.la
+find $PKGD/usr/lib${LIBDIRSUFFIX} -name "*.so*" -exec rm -vf {} \+
+
+cd $FFBLD
+
+# Building libdvdread
+
+tar xvf $FFSRC/libdvdread-$dvrver.tar.bz2
+cd libdvdread-$dvrver
+chown -R root:root .
+find . -perm 777 -exec chmod 755 {} \+
+find . -perm 664 -exec chmod 644 {} \+
+
+[ ! -x configure ] && ./autogen.sh
+CPPFLAGS="-I$PKGD/usr/include" \
+CFLAGS="$SCFLAGS" \
+CXXFLAGS="$SCXXFLAGS" \
+LDFLAGS="$SLDFLAGS -L$PKGD/usr/lib -L$PKGD/usr/lib64" \
+./configure \
+  --prefix=/usr \
+  --libdir=/usr/lib${LIBDIRSUFFIX} \
+  --docdir=/usr/doc/libdvdread-$dvrver \
+  --sysconfdir=/etc \
+  --localstatedir=/var \
+  --disable-shared \
+  --enable-static
+
+make -j$nprocr 2>&1 | tee $OUTPUT/make-dvdread.log
+make install DESTDIR=$PKGD 2>&1 | tee $OUTPUT/install-dvdread.log
+
+mkdir -pv $PKGD/doc/libdvdread-$dvrver
+cp -av AUTHORS COPYING* README*  $PKGD/doc/libdvdread-$dvrver
+
+rm -vf $PKGD/usr/lib${LIBDIRSUFFIX}/*.la
+find $PKGD/usr/lib${LIBDIRSUFFIX} -name "*.so*" -exec rm -vf {} \+
+
+cd $FFBLD
+
+# Building Freetype2
+
+tar xvf $FFSRC/freetype-$ftver.tar.xz
+cd freetype-$ftver
+chown -R root:root .
+find . -perm 777 -exec chmod 755 {} \+
+find . -perm 664 -exec chmod 644 {} \+
+
+CPPFLAGS="-I$PKGD/usr/include" \
+CFLAGS="$SCFLAGS" \
+CXXFLAGS="$SCXXFLAGS" \
+LDFLAGS="$SLDFLAGS -L$PKGD/usr/lib -L$PKGD/usr/lib64" \
+./configure \
+  --prefix=/usr \
+  --libdir=/usr/lib${LIBDIRSUFFIX} \
+  --sysconfdir=/etc \
+  --localstatedir=/var \
+  --mandir=/usr/man \
+  --docdir=/usr/doc/freetype-$ftver \
+  --enable-shared=no \
+  --enable-shared=yes \
+  --enable-freetype-config \
+  --with-harfbuzz=no \
+  --with-gnu-ld
+
+make -j$nprocr 2>&1 | tee $OUTPUT/make-freetype.log
+make install DESTDIR=$PKGD 2>&1 | tee $OUTPUT/install-freetype.log
+
+mkdir -pv $PKGD/doc/freetype-$ftver
+cp -av README LICENSE.TXT $PKGD/doc/freetype-$ftver
+
+rm -vf $PKGD/usr/lib${LIBDIRSUFFIX}/*.la
+find $PKGD/usr/lib${LIBDIRSUFFIX} -name "*.so*" -exec rm -vf {} \+
+
+cd $FFBLD
+
+# Building Fontconfig
+
+tar xvf $FFSRC/fontconfig-$focver.tar.xz
+cd fontconfig-$focver
+chown -R root:root .
+find . -perm 777 -exec chmod 755 {} \+
+find . -perm 664 -exec chmod 644 {} \+
+
+# From patrick's fontconfig slackbuild
+# Patches from Fedora and Debian:
+cat $CWD/patches/02_indic_names.patch | patch -p1 --verbose || exit 1
+cat $CWD/patches/04_mgopen_fonts.patch | patch -p1 --verbose || exit 1
+cat $CWD/patches/disable-crbug1004354.patch | patch -p1 --verbose || exit 1
+cat $CWD/patches/fontconfig-sleep-less.patch | patch -p1 --verbose || exit 1
+cat $CWD/patches/fontconfig-remove-uuid.patch | patch -p1 --verbose || exit 1
+cat $CWD/patches/fontconfig-drop-lang-from-pkgkit-format.patch | patch -p1 --verbose || exit 1
+cat $CWD/patches/fontconfig-fix-SAST.patch | patch -p1 --verbose || exit 1
+
+# Hardcode the default font search path rather than having fontconfig figure
+# it out (and possibly follow symlinks, or index ugly bitmapped fonts):
+cat $CWD/patches/fontconfig.font.dir.list.diff | patch -p1 --verbose || exit 1
+
+# Some "no bitmap" conf files from Fedora. We'll include them but won't be
+# enabling them.
+cat $CWD/patches/fontconfig.70.no.bitmaps.conf.diff | patch -p1 --verbose || exit 1
+
+# Prefer Liberation for sans and serif, as we have for many years:
+cat $CWD/patches/fontconfig.liberation.diff | patch -p1 --verbose || exit 1
+
+CFLAGS="$SCFLAGS -I$PKGD/usr/include" \
+CXXFLAGS="$SCXXFLAGS -I$PKGD/usr/include" \
+LDFLAGS="$SLDFLAGS -L$PKGD/usr/lib64 -L$PKGD/usr/lib" meson build \
+    -Dbuildtype=release \
+    -Dlibdir=/usr/lib${LIBDIRSUFFIX} \
+    -Dlocalstatedir=/var \
+    -Dmandir=/usr/man \
+    -Dprefix=/usr \
+    -Dsysconfdir=/etc \
+    -Ddefault_library=static \
+    -Dstrip=true \
+    -Dcache-build=disabled \
+    -Ddefault-hinting=full \
+    -Ddefault-sub-pixel-rendering=none \
+    -Ddoc-html=disabled \
+    -Ddoc-pdf=disabled \
+    -Ddoc-txt=disabled
+
+ninja -j$nprocr -C build 2>&1 | tee $OUTPUT/make-fontconfig.log
+DESTDIR=$PKGD ninja -C build  install 2>&1 | tee $OUTPUT/install-fontconfig.log
+
+mkdir -pv $PKGD/doc/fontconfig-$focver
+cp -av AUTHORS COPYING $PKGD/doc/fontconfig-$focver
+
+rm -vf $PKGD/usr/lib${LIBDIRSUFFIX}/*.la
+find $PKGD/usr/lib${LIBDIRSUFFIX} -name "*.so*" -exec rm -vf {} \+
+
+cd $FFBLD
+
+# Building Fribi
+
+tar xvf $FFSRC/fribidi-$fbidiver.tar.gz
+cd fribidi-$fbidiver
+chown -R root:root .
+find . -perm 777 -exec chmod 755 {} \+
+find . -perm 664 -exec chmod 644 {} \+
+
+[ ! -x configure ] && ./autogen.sh
+CPPFLAGS="-I$PKGD/usr/include" \
+CFLAGS="$SCFLAGS" \
+CXXFLAGS="$SCXXFLAGS" \
+LDFLAGS="$SLDFLAGS -L$PKGD/usr/lib -L$PKGD/usr/lib64" \
+./configure \
+  --prefix=/usr \
+  --libdir=/usr/lib${LIBDIRSUFFIX} \
+  --sysconfdir=/etc \
+  --localstatedir=/var \
+  --mandir=/usr/man \
+  --docdir=/usr/doc/fribidi-$fbidiver \
+  --enable-static=yes \
+  --disable-shared \
+  --enable-pic \
+  --with-gnu-ld
+
+make -j$nprocr 2>&1 | tee $OUTPUT/make-fribidi.log
+make install DESTDIR=$PKGD 2>&1 | tee $OUTPUT/install-fribidi.log
+
+mkdir -pv $PKGD/doc/fribidi-$fbidiver
+cp -av AUTHORS COPYING README README.md $PKGD/doc/fribidi-$fbidiver
+
+rm -vf $PKGD/usr/lib${LIBDIRSUFFIX}/*.la
+find $PKGD/usr/lib${LIBDIRSUFFIX} -name "*.so*" -exec rm -vf {} \+
+
+cd $FFBLD
+
+# Bui.ding Harfbuzz
+
+tar xvf $FFSRC/harfbuzz-$hbuzver.tar.xz
+cd harfbuzz-$hbuzver
+chown -R root:root .
+find . -perm 777 -exec chmod 755 {} \+
+find . -perm 664 -exec chmod 644 {} \+
+
+CFLAGS="$SCFLAGS -I$PKGD/usr/include" \
+CXXFLAGS="$SCXXFLAGS -I$PKGD/usr/include" \
+LDFLAGS="$SLDFLAGS -L$PKGD/usr/lib64 -L$PKGD/usr/lib" meson build \
+    -Dbuildtype=release \
+    -Dlibdir=/usr/lib${LIBDIRSUFFIX} \
+    -Dlocalstatedir=/var \
+    -Dmandir=/usr/man \
+    -Dprefix=/usr \
+    -Dsysconfdir=/etc \
+    -Ddefault_library=static \
+    -Dstrip=true
+
+ninja -j$nprocr -C build 2>&1 | tee $OUTPUT/make-harfbuzz.log
+DESTDIR=$PKGD ninja -C build  install 2>&1 | tee $OUTPUT/install-harfbuzz.log
+
+mkdir -pv $PKGD/doc/harfbuzz-$hbuzver
+cp -av AUTHORS COPYING $PKGD/doc/harfbuzz-$hbuzver
+
+rm -vf $PKGD/usr/lib${LIBDIRSUFFIX}/*.la
+find $PKGD/usr/lib${LIBDIRSUFFIX} -name "*.so*" -exec rm -vf {} \+
+
+cd $FFBLD
+
+tar xvf $FFSRC/libunibreak-6.1.tar.gz
+cd libunibreak-6.1
+chown -R root:root .
+find . -perm 777 -exec chmod 755 {} \+
+find . -perm 664 -exec chmod 644 {} \+
+
+[ ! -x configure ] && autoreconf -fiv
+CPPFLAGS="-I$PKGD/usr/include" \
+CFLAGS="$SCFLAGS" \
+CXXFLAGS="$SCXXFLAGS" \
+LDFLAGS="$SLDFLAGS -L$PKGD/usr/lib -L$PKGD/usr/lib64" \
+./configure \
+  --prefix=/usr \
+  --libdir=/usr/lib${LIBDIRSUFFIX} \
+  --sysconfdir=/etc \
+  --localstatedir=/var \
+  --mandir=/usr/man \
+  --docdir=/usr/doc/libunibreak-6.1 \
+  --enable-static=yes \
+  --disable-shared  2>&1 | tee $OUTPUT/configure-unibreak.log
+
+make -j$nprocr 2>&1 | tee $OUTPUT/make-unibreak.log
+make install DESTDIR=$PKGD 2>&1 | tee $OUTPUT/install-unibreak.log
+
+mkdir -pv $PKGD/doc/libunibreak-6.1
+cp -a AUTHORS* LICEN* NEWS README* doc/html $PKGD/doc/libunibreak-6.1
+
+rm -vf $PKGD/usr/lib${LIBDIRSUFFIX}/*.la
+find $PKGD/usr/lib${LIBDIRSUFFIX} -name "*.so*" -exec rm -vf {} \+
+
+cd $FFBLD
+
+tar xvf $FFSRC/libass-0.17.3.tar.xz
+cd libass-0.17.3
+chown -R root:root .
+find . -perm 777 -exec chmod 755 {} \+
+find . -perm 664 -exec chmod 644 {} \+
+
+CFLAGS="$SCFLAGS -I$PKGD/usr/include" \
+CXXFLAGS="$SCXXFLAGS -I$PKGD/usr/include" \
+LDFLAGS="$SLDFLAGS -L$PKGD/usr/lib64 -L$PKGD/usr/lib" \
+PKG_CONFIG_PATH=/tmp/SBo/dep/usr/lib64/pkgconfig \
+LIBUNIBREAK_CFLAGS="-I$PKGD/usr/include" \
+LIBUNIBREAK_LIBS="-L$PKGD/usr/lib64 -lunibreak"  meson build \
+    -Dbuildtype=release \
+    -Dlibdir=/usr/lib${LIBDIRSUFFIX} \
+    -Dlocalstatedir=/var \
+    -Dmandir=/usr/man \
+    -Dprefix=/usr \
+    -Dsysconfdir=/etc \
+    -Ddefault_library=static \
+    -Ddirectwrite=disabled \
+    -Dcoretext=disabled \
+    -Dfontconfig=enabled \
+    -Dlibunibreak=enabled \
+    -Dasm=enabled \
+    -Dstrip=true 2>&1 | tee $OUTPUT/configure-ass.log
+
+ninja -j$nprocr -C build 2>&1 | tee $OUTPUT/make-ass.log
+DESTDIR=$PKGD ninja -C build  install 2>&1 | tee $OUTPUT/install-ass.log
+
+mkdir -pv $PKGD/doc/libass-0.17.3
+cp -av Changelog COPYING $PKGD/doc/libass-0.17.3
+
+rm -vf $PKGD/usr/lib${LIBDIRSUFFIX}/*.la
+find $PKGD/usr/lib${LIBDIRSUFFIX} -name "*.so*" -exec rm -vf {} \+
+
+cd $FFBLD
+
+# Building libtwolame
+
+tar xvf $FFSRC/twolame-$twolver.tar.gz
+cd twolame-$twolver
+chown -R root:root .
+find . -perm 777 -exec chmod 755 {} \+
+find . -perm 664 -exec chmod 644 {} \+
+
+CPPFLAGS="-I$PKGD/usr/include" \
+CFLAGS="$SCFLAGS" \
+CXXFLAGS="$SCXXFLAGS" \
+LDFLAGS="$SLDFLAGS -L$PKGD/usr/lib -L$PKGD/usr/lib64" \
+./configure \
+  --prefix=/usr \
+  --libdir=/usr/lib${LIBDIRSUFFIX} \
+  --sysconfdir=/etc \
+  --localstatedir=/var \
+  --mandir=/usr/man \
+  --enable-static \
+  --disable-shared
+
+make -j$nprocr 2>&1 | tee $OUTPUT/make-twolame.log
+make install DESTDIR=$PKGD 2>&1 | tee $OUTPUT/install-twolame.log
+
+mkdir -pv $PKGD/doc/twolame-$twolver
+cp -av AUTHORS COPYING README $PKGD/doc/twolame-$twolver
+
+rm -vf $PKGD/usr/lib${LIBDIRSUFFIX}/*.la
+find $PKGD/usr/lib${LIBDIRSUFFIX} -name "*.so*" -exec rm -vf {} \+
+
+cd $FFBLD
+
+# Building xvidcore
+
+tar xvf $FFSRC/xvidcore-$xvidver.tar.gz
+cd xvidcore
+chown -R root:root .
+find . -perm 777 -exec chmod 755 {} \+
+find . -perm 664 -exec chmod 644 {} \+
+
+cd build/generic
+CPPFLAGS="-I$PKGD/usr/include" \
+CFLAGS="$SCFLAGS" \
+CXXFLAGS="$SCXXFLAGS" \
+LDFLAGS="$SLDFLAGS -L$PKGD/usr/lib -L$PKGD/usr/lib64" \
+./configure \
+  --prefix=/usr \
+  --libdir=/usr/lib${LIBDIRSUFFIX} \
+  --sysconfdir=/etc \
+  --localstatedir=/var \
+  --disable-shared \
+  --enable-static
+
+make -j$nprocr 2>&1 | tee -a $OUTPUT/make-xvid.log
+make install DESTDIR=$PKGD 2>&1 | tee -a $OUTPUT/install-xvid.log
+
+cd $FFBLD/xvidcore
+
+mkdir -pv $PKGD/doc/xvidcore-$xvidver
+cp -av AUTHORS LICENSE README $PKGD/doc/xvidcore-$xvidver
+
+rm -vf $PKGD/usr/lib${LIBDIRSUFFIX}/*.la
+find $PKGD/usr/lib${LIBDIRSUFFIX} -name "*.so*" -exec rm -vf {} \+
+
+cd $FFBLD
+
+# Building lpcnet
+
+tar xvf $FFSRC/LPCNet-$lpcver.tar.gz
+cd LPCNet-$lpcver
+chown -R root:root .
+find . -perm 777 -exec chmod 755 {} \+
+find . -perm 664 -exec chmod 644 {} \+
+
+cmake -B build -S $FFBLD/LPCNet-$lpcver \
+    -DCMAKE_C_FLAGS:STRING="$SCFLAGS -I$PKGD/usr/include" \
+    -DCMAKE_CXX_FLAGS:STRING="$SCXXFLAGS -I$PKGD/usr/include" \
+    -DCMAKE_C_FLAGS_RELEASE:STRING="$SCFLAGS -I$PKGD/usr/include" \
+    -DCMAKE_CXX_FLAGS_RELEASE:STRING="$SCXXFLAGS -I$PKGD/usr/include" \
+    -DCMAKE_EXE_LINKER_FLAGS="$SLDFLAGS -L$PKGD/usr/lib -L$PKGD/usr/lib64"  \
+    -DCMAKE_INSTALL_PREFIX=/usr \
+    -DCMAKE_INSTALL_LIBDIR=/usr/lib${LIBDIRSUFFIX} \
+    -DMAN_INSTALL_DIR=/usr/man \
+    -DUSE_INTERNAL_CODEC2=FALSE \
+    -DBUILD_SHARED_LIBS:BOOL=OFF \
+    -DCMAKE_BUILD_TYPE=Release
+
+cmake --build build --parallel $nprocr 2>&1 | tee $OUTPUT/make-lpcnet.log
+DESTDIR=$PKGD cmake --install build 2>&1 | tee $OUTPUT/install-lpcnet.log
+
+mkdir -pv $PKGD/doc/LPCNet-$lpcver
+cp -av COPYING README.md $PKGD/doc/LPCNet-$lpcver
+
+rm -vf $PKGD/usr/lib${LIBDIRSUFFIX}/*.la
+find $PKGD/usr/lib${LIBDIRSUFFIX} -name "*.so*" -exec rm -vf {} \+
+
+cd $FFBLD
+
+# Building codec2
+
+tar xvf $FFSRC/codec2-$codver.tar.gz
+cd codec2-$codver
+chown -R root:root .
+find . -perm 777 -exec chmod 755 {} \+
+find . -perm 664 -exec chmod 644 {} \+
+
+cmake -B build -S $FFBLD/codec2-$codver \
+    -DCMAKE_C_FLAGS:STRING="$SCFLAGS -I$PKGD/usr/include" \
+    -DCMAKE_CXX_FLAGS:STRING="$SCXXFLAGS -I$PKGD/usr/include" \
+    -DCMAKE_C_FLAGS_RELEASE:STRING="$SCFLAGS -I$PKGD/usr/include" \
+    -DCMAKE_CXX_FLAGS_RELEASE:STRING="$SCXXFLAGS -I$PKGD/usr/include" \
+    -DCMAKE_EXE_LINKER_FLAGS="$SLDFLAGS -L$PKGD/usr/lib -L$PKGD/usr/lib64"  \
+    -DCMAKE_INSTALL_PREFIX=/usr \
+    -DLIB_SUFFIX=${LIBDIRSUFFIX} \
+    -DMAN_INSTALL_DIR=/usr/man \
+    -DBUILD_SHARED_LIBS:BOOL=OFF \
+    -DCMAKE_BUILD_TYPE=Release
+
+cmake --build build --parallel $nprocr 2>&1 | tee $OUTPUT/make-codec2.log
+DESTDIR=$PKGD cmake --install build 2>&1 | tee $OUTPUT/install-codec2.log
+
+mkdir -pv $PKGD/doc/codec2-$codver
+cp -av  COPYING README*.md $PKGD/doc/codec2-$codver
+
+rm -vf $PKGD/usr/lib${LIBDIRSUFFIX}/*.la
+find $PKGD/usr/lib${LIBDIRSUFFIX} -name "*.so*" -exec rm -vf {} \+
+
+cd $FFBLD
+
+# Building libvmaf
+
+tar xvf $FFSRC/vmaf-$vmafver.tar.gz
+cd vmaf-$vmafver
+chown -R root:root .
+find . -perm 777 -exec chmod 755 {} \+
+find . -perm 664 -exec chmod 644 {} \+
+
+cd libvmaf
+
+CFLAGS="$SCFLAGS -I$PKGD/usr/include" \
+CXXFLAGS="$SCXXFLAGS -I$PKGD/usr/include" \
+LDFLAGS="$SLDFLAGS -L$PKGD/usr/lib64 -L$PKGD/usr/lib" meson build \
+    -Dbuildtype=release \
+    -Dlibdir=/usr/lib${LIBDIRSUFFIX} \
+    -Dlocalstatedir=/var \
+    -Dmandir=/usr/man \
+    -Dprefix=/usr \
+    -Dsysconfdir=/etc \
+    -Ddefault_library=static \
+    -Denable_float=true \
+    -Dstrip=true
+
+ninja -j$nprocr -C build 2>&1 | tee $OUTPUT/make-vmaf.log
+DESTDIR=$PKGD ninja -C build  install 2>&1 | tee $OUTPUT/install-vmaf.log
+
+cd $FFBLD/vmaf-$vmafver
+
+mkdir -pv $PKGD/doc/vmaf-$vmafver
+cp -av LICENSE README.md   $PKGD/doc/vmaf-$vmafver
+
+rm -vf $PKGD/usr/lib${LIBDIRSUFFIX}/*.la
+find $PKGD/usr/lib${LIBDIRSUFFIX} -name "*.so*" -exec rm -vf {} \+
+
+cd $FFBLD
+
+export vf="$PKGD/usr/include/libvmaf"
+
+# Building libaom
+
+tar xvf $FFSRC/aom_3.11.0.orig.tar.gz
+cd aom-3.11.0
+chown -R root:root .
+find . -perm 777 -exec chmod 755 {} \+
+find . -perm 664 -exec chmod 644 {} \+
+
+PKG_CONFIG_PATH=/tmp/SBo/dep/usr/lib64/pkgconfig cmake -B build -S $FFBLD/aom-$aomver \
+    -DCMAKE_C_FLAGS:STRING="-I$PKGD/usr/include -I$vf $SCFLAGS" \
+    -DCMAKE_CXX_FLAGS:STRING="-I$PKGD/usr/include -I$vf $SCXXFLAGS" \
+    -DCMAKE_C_FLAGS_RELEASE:STRING="-I$PKGD/usr/include -I$vf $SCFLAGS" \
+    -DCMAKE_CXX_FLAGS_RELEASE:STRING="-I$PKGD/usr/include -I$vf $SCXXFLAGS" \
+    -DCMAKE_EXE_LINKER_FLAGS="-L$PKGD/usr/lib -L$PKGD/usr/lib64 $SLDFLAGS"  \
+    -DCMAKE_INSTALL_PREFIX=/usr \
+    -DCMAKE_INSTALL_INCLUDEDIR=include \
+    -DCMAKE_INSTALL_LIBDIR=lib${LIBDIRSUFFIX} \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DENABLE_NASM=1 \
+    -DENABLE_DOCS=0 \
+    -DBUILD_SHARED_LIBS=0 \
+    -DCONFIG_MULTITHREAD=1 \
+    -DCONFIG_RUNTIME_CPU_DETECT=1 \
+    -DCONFIG_WEBM_IO=1 \
+    -DCONFIG_LIBYUV=1 \
+    -DCONFIG_TUNE_VMAF=1 \
+    -DENABLE_TESTS=0
+
+cmake --build build --parallel $nprocr 2>&1 | tee -a $OUTPUT/make-aom.log
+DESTDIR=$PKGD cmake --install build 2>&1 | tee -a $OUTPUT/install-aom.log
+
+mkdir -pv $PKGD/doc/aom-$aomver
+cp -a AUTHORS CHANGELOG LICENSE PATENTS README.md Sample.cfg $PKGD/doc/aom-$aomver
+
+rm -vf $PKGD/usr/lib${LIBDIRSUFFIX}/*.la
+find $PKGD/usr/lib${LIBDIRSUFFIX} -name "*.so*" -exec rm -vf {} \+
+
+cd $FFBLD
+
+# Building svt-av1
+
+tar xvf $FFSRC/$svtnam.tar.gz
+cd $svtnam
+chown -R root:root .
+find . -perm 777 -exec chmod 755 {} \+
+find . -perm 664 -exec chmod 644 {} \+
+
+cmake -B build -S $FFBLD/$svtnam \
+    -DCMAKE_C_FLAGS:STRING="$SCFLAGS -I$PKGD/usr/include" \
+    -DCMAKE_CXX_FLAGS:STRING="$SCXXFLAGS -I$PKGD/usr/include" \
+    -DCMAKE_C_FLAGS_RELEASE:STRING="$SCFLAGS -I$PKGD/usr/include" \
+    -DCMAKE_CXX_FLAGS_RELEASE:STRING="$SCXXFLAGS -I$PKGD/usr/include" \
+    -DCMAKE_EXE_LINKER_FLAGS="$SLDFLAGS -L$PKGD/usr/lib -L$PKGD/usr/lib64"  \
+    -DCMAKE_INSTALL_PREFIX=/usr \
+    -DCMAKE_INSTALL_INCLUDEDIR=include \
+    -DCMAKE_INSTALL_LIBDIR=lib${LIBDIRSUFFIX} \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DBUILD_SHARED_LIBS=OFF \
+    -DBUILD_TESTING=OFF \
+    -DSVT_AV1_PGO=OFF
+
+cmake --build build --parallel $nprocr 2>&1 | tee -a $OUTPUT/make-svtav1.log
+DESTDIR=$PKGD cmake --install build 2>&1 | tee -a $OUTPUT/install-svtav1.log
+
+mkdir -pv $PKGD/doc/svtav1
+cp -a CONTRIBUTING.md PATENTS.md LICENSE.md LICENSE-BSD2.md README.md $PKGD/doc/svtav1
+
+rm -vf $PKGD/usr/lib${LIBDIRSUFFIX}/*.la
+find $PKGD/usr/lib${LIBDIRSUFFIX} -name "*.so*" -exec rm -vf {} \+
+
+cd $FFBLD
+
+# Build libdav1d
+
+tar xvf $FFSRC/dav1d-$daver.tar.gz
+cd dav1d-$daver
+chown -R root:root .
+find . -perm 777 -exec chmod 755 {} \+
+find . -perm 664 -exec chmod 644 {} \+
+
+CFLAGS="-I$PKGD/usr/include $SCFLAGS" \
+CXXFLAGS="-I$PKGD/usr/include $SCXXFLAGS" \
+LDFLAGS="-L$PKGD/usr/lib64 -L$PKGD/usr/lib $SLDFLAGS" meson build \
+    -Dbuildtype=release \
+    -Dlibdir=/usr/lib${LIBDIRSUFFIX} \
+    -Dlocalstatedir=/var \
+    -Dmandir=/usr/man \
+    -Dprefix=/usr \
+    -Dsysconfdir=/etc \
+    -Ddefault_library=static \
+    -Dstrip=true
+
+ninja -j$nprocr -C build 2>&1 | tee $OUTPUT/make-dav1d.log
+DESTDIR=$PKGD ninja -C build  install 2>&1 | tee $OUTPUT/install-dav1d.log
+
+mkdir -pv $PKGD/doc/davld-$daver
+cp -av COPYING README.md THANKS.md $PKGD/doc/davld-$daver
+
+rm -vf $PKGD/usr/lib${LIBDIRSUFFIX}/*.la
+find $PKGD/usr/lib${LIBDIRSUFFIX} -name "*.so*" -exec rm -vf {} \+
+
+cd $FFBLD
+
+# Building lcms2
+
+tar xvf $FFSRC/lcms2-$lcmver.tar.gz
+cd lcms2-$lcmver
+chown -R root:root .
+find . -perm 777 -exec chmod 755 {} \+
+find . -perm 664 -exec chmod 644 {} \+
+
+CPPFLAGS="-I$PKGD/usr/include" \
+CFLAGS="$SCFLAGS" \
+CXXFLAGS="$SCXXFLAGS" \
+LDFLAGS="-L$PKGD/usr/lib -L$PKGD/usr/lib64 $SLDFLAGS" \
+./configure \
+  --prefix=/usr \
+  --libdir=/usr/lib${LIBDIRSUFFIX} \
+  --includedir=/usr/include \
+  --sysconfdir=/etc \
+  --localstatedir=/var \
+  --mandir=/usr/man \
+  --enable-static \
+  --disable-shared \
+  --with-fastfloat  \
+  --with-threaded \
+  --with-jpeg="$PKGD/usr/bin" \
+  --with-tiff="$PKGD/usr/bin" \
+  --with-gnu-ld
+
+make -j$nprocr 2>&1 | tee $OUTPUT/make-lcms.log
+make install DESTDIR=$PKGD 2>&1 | tee $OUTPUT/install-lcms.log
+
+mkdir -pv $PKGD/doc/lcms2-$lcmver
+cp -a AUTHORS LICENSE README.md $PKGD/doc/lcms2-$lcmver
+
+rm -vf $PKGD/usr/lib${LIBDIRSUFFIX}/*.la
+find $PKGD/usr/lib${LIBDIRSUFFIX} -name "*.so*" -exec rm -vf {} \+
+
+cd $FFBLD
+
+# Building libopenjpeg
+
+tar xvf $FFSRC/openjpeg-$ojver.tar.gz
+cd openjpeg-$ojver
+chown -R root:root .
+find . -perm 777 -exec chmod 755 {} \+
+find . -perm 664 -exec chmod 644 {} \+
+
+cmake -B build -S $FFBLD/openjpeg-$ojver \
+    -DCMAKE_C_FLAGS:STRING="-I$PKGD/usr/include $SCFLAGS" \
+    -DCMAKE_CXX_FLAGS:STRING="-I$PKGD/usr/include $SCXXFLAGS" \
+    -DCMAKE_C_FLAGS_RELEASE:STRING="-I$PKGD/usr/include $SCFLAGS" \
+    -DCMAKE_CXX_FLAGS_RELEASE:STRING=" -I$PKGD/usr/include $SCXXFLAGS" \
+    -DCMAKE_EXE_LINKER_FLAGS="$SLDFLAGS -L$PKGD/usr/lib -L$PKGD/usr/lib64"  \
+    -DCMAKE_INSTALL_PREFIX=/usr \
+    -DCMAKE_INSTALL_LIBDIR=/usr/lib${LIBDIRSUFFIX} \
+    -DCMAKE_INSTALL_INCLUDEDIR=/usr/include \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DBUILD_SHARED_LIBS=OFF \
+    -DBUILD_STATIC_LIBS=ON
+
+cmake --build build --parallel $nprocr 2>&1 | tee $OUTPUT/make-openjpeg.log
+DESTDIR=$PKGD cmake --install build 2>&1 | tee $OUTPUT/install-openjpeg.log
+
+mkdir -pv $PKGD/doc/openjpeg-$ojver
+cp -av AUTHORS.md LICENSE README.md $PKGD/doc/openjpeg-$ojver
+
+rm -vf $PKGD/usr/lib${LIBDIRSUFFIX}/*.la
+find $PKGD/usr/lib${LIBDIRSUFFIX} -name "*.so*" -exec rm -vf {} \+
+
+cd $FFBLD
+
+tar xvf $FFSRC/snappy-$snaver.tar.gz
+cd snappy-$snaver
+chown -R root:root .
+find . -perm 777 -exec chmod 755 {} \+
+find . -perm 664 -exec chmod 644 {} \+
+
+cmake -B build -S $FFBLD/snappy-$snaver \
+    -DCMAKE_C_FLAGS:STRING="-I$PKGD/usr/include $SCFLAGS" \
+    -DCMAKE_CXX_FLAGS:STRING="-I$PKGD/usr/include $SCXXFLAGS" \
+    -DCMAKE_C_FLAGS_RELEASE:STRING="-I$PKGD/usr/include $SCFLAGS" \
+    -DCMAKE_CXX_FLAGS_RELEASE:STRING=" -I$PKGD/usr/include $SCXXFLAGS" \
+    -DCMAKE_EXE_LINKER_FLAGS="-L$PKGD/usr/lib -L$PKGD/usr/lib64 $SLDFLAGS"  \
+    -DCMAKE_INSTALL_PREFIX=/usr \
+    -DCMAKE_INSTALL_LIBDIR=/usr/lib${LIBDIRSUFFIX} \
+    -DCMAKE_INSTALL_INCLUDEDIR=/usr/include \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DBUILD_SHARED_LIBS=OFF \
+    -DSNAPPY_BUILD_TESTS=OFF \
+    -DSNAPPY_BUILD_BENCHMARKS=OFF \
+    -DSNAPPY_FUZZING_BUILD=OFF
+
+cmake --build build --parallel $nprocr 2>&1 | tee $OUTPUT/make-snappy.log
+DESTDIR=$PKGD cmake --install build 2>&1 | tee $OUTPUT/install-snappy.log
+
+mkdir -pv $PKGD/doc/snappy-$snaver
+cp -av AUTHORS COPYING README.md $PKGD/doc/snappy-$snaver
+
+rm -vf $PKGD/usr/lib${LIBDIRSUFFIX}/*.la
+find $PKGD/usr/lib${LIBDIRSUFFIX} -name "*.so*" -exec rm -vf {} \+
+
+cd $FFBLD
+
+# Building libsrt
+
+tar xvf $FFSRC/srt-$srver.tar.gz
+cd srt-$srver
+chown -R root:root .
+find . -perm 777 -exec chmod 755 {} \+
+find . -perm 664 -exec chmod 644 {} \+
+
+cmake -B build -S $FFBLD/srt-$srver \
+    -DCMAKE_C_FLAGS:STRING="-I$PKGD/usr/include $SCFLAGS" \
+    -DCMAKE_CXX_FLAGS:STRING="-I$PKGD/usr/include $SCXXFLAGS" \
+    -DCMAKE_C_FLAGS_RELEASE:STRING="-I$PKGD/usr/include $SCFLAGS" \
+    -DCMAKE_CXX_FLAGS_RELEASE:STRING=" -I$PKGD/usr/include $SCXXFLAGS" \
+    -DCMAKE_EXE_LINKER_FLAGS="-L$PKGD/usr/lib -L$PKGD/usr/lib64 $SLDFLAGS"  \
+    -DCMAKE_INSTALL_PREFIX=/usr \
+    -DCMAKE_INSTALL_LIBDIR=/usr/lib${LIBDIRSUFFIX} \
+    -DCMAKE_INSTALL_INCLUDEDIR=/usr/include \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DENABLE_LOGGING=OFF \
+    -DENABLE_SHARED=OFF \
+    -DENABLE_STATIC=ON
+
+cmake --build build --parallel $nprocr 2>&1 | tee $OUTPUT/make-srt.log
+DESTDIR=$PKGD cmake --install build 2>&1 | tee $OUTPUT/install-srt.log
+
+mkdir -pv $PKGD/doc/srt-$srver
+cp -av LICENSE README.md $PKGD/doc/srt-$srver
+
+rm -vf $PKGD/usr/lib${LIBDIRSUFFIX}/*.la
+find $PKGD/usr/lib${LIBDIRSUFFIX} -name "*.so*" -exec rm -vf {} \+
+
+cd $FFBLD
+
+# Building libwebp
+
+tar xvf $FFSRC/libwebp-$webpver.tar.gz
+cd libwebp-$webpver
+chown -R root:root .
+find . -perm 777 -exec chmod 755 {} \+
+find . -perm 664 -exec chmod 644 {} \+
+
+# The patch is from archlinux
+# https://gitlab.archlinux.org/archlinux/packaging/packages/libwebp/-/blob/main/0001-cmake-Install-anim-utils.patch?ref_type=heads
+
+patch --verbose -Np1 < $CWD/patches/0001-cmake-Install-anim-utils.patch || exit 1
+
+PKG_CONFIG_PATH=/tmp/SBo/dep/usr/lib64/pkgconfig cmake -B build -S $FFBLD/libwebp-$webpver \
+    -DCMAKE_C_FLAGS:STRING="-I$PKGD/usr/include $SCFLAGS" \
+    -DCMAKE_CXX_FLAGS:STRING="-I$PKGD/usr/include $SCXXFLAGS" \
+    -DCMAKE_C_FLAGS_RELEASE:STRING=" -I$PKGD/usr/include $SCFLAGS" \
+    -DCMAKE_CXX_FLAGS_RELEASE:STRING="-I$PKGD/usr/include $SCXXFLAGS" \
+    -DCMAKE_EXE_LINKER_FLAGS="-L$PKGD/usr/lib -L$PKGD/usr/lib64 $SLDFLAGS"  \
+    -DCMAKE_INSTALL_PREFIX=/usr \
+    -DCMAKE_INSTALL_LIBDIR=lib${LIBDIRSUFFIX} \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DWEBP_LINK_STATIC_DEFAULT=ON \
+    -DBUILD_SHARED_LIBS=OFF \
+    -DWEBP_ENABLE_SWAP_16BIT_CSP=ON \
+    -DWEBP_BITTRACE=2
+
+cmake --build build --parallel $nprocr 2>&1 | tee -a $OUTPUT/make-webp.log
+DESTDIR=$PKGD cmake --install build 2>&1 | tee -a $OUTPUT/install-webp.log
+
+mkdir -pv $PKGD/doc/webp-$webpver
+cp -av AUTHORS COPYING PATENTS README.md $PKGD/doc/webp-$webpver
+
+rm -vf $PKGD/usr/lib${LIBDIRSUFFIX}/*.la
+find $PKGD/usr/lib${LIBDIRSUFFIX} -name "*.so*" -exec rm -vf {} \+
+
+cd $FFBLD
+
+# Building libvpx
+
+tar xvf $FFSRC/libvpx-$vpxver.tar.gz
+cd libvpx-$vpxver
+chown -R root:root .
+find . -perm 777 -exec chmod 755 {} \+
+find . -perm 664 -exec chmod 644 {} \+
+
+# From slackware64-current:
+# Looks like this avoids possible problems with ffmpeg after a supposedly
+# ABI compatible libvpx upgrade. Probably doesn't hurt. Thanks to Debian.
+
+cat $CWD/patches/0001-Relax-ABI-check.patch | patch -p1 --verbose || exit 1
+
+# From BLFS, BLFS recommends a dedicated build directory for libvpx
+
+sed -i 's/cp -p/cp/' build/make/Makefile
+mkdir -pv libvpx-build
+cd libvpx-build
+CPPFLAGS="-I$PKGD/usr/include" \
+CFLAGS="$SCFLAGS" \
+CXXFLAGS="$SCXXFLAGS" \
+LDFLAGS="-L$PKGD/usr/lib -L$PKGD/usr/lib64 $SLDFLAGS" \
+../configure \
+  --prefix=/usr \
+  --libdir=/usr/lib${LIBDIRSUFFIX} \
+  --enable-static \
+  --disable-shared \
+  --disable-debug-libs \
+  --disable-debug \
+  --enable-pic \
+  --disable-install-docs \
+  --disable-examples \
+  --disable-docs \
+  --enable-codec-srcs \
+  --enable-vp9-highbitdepth \
+  --enable-better-hw-compatibility \
+  --enable-vp8 \
+  --enable-vp9 \
+  --enable-postproc \
+  --enable-onthefly-bitpacking \
+  --enable-coefficient-range-checking \
+  --enable-runtime-cpu-detect \
+  --enable-postproc-visualizer \
+  --enable-multi-res-encoding \
+  --enable-vp9-temporal-denoising \
+  --enable-webm-io \
+  --enable-libyuv \
+  --target=x86_64-linux-gcc 2>&1 | tee -a $OUTPUT/configure-vpx.log
+
+make -j$nprocr 2>&1 | tee -a $OUTPUT/make-vpx.log
+make install DESTDIR=$PKGD  2>&1 | tee -a $OUTPUT/install-vpx.log
+
+cd $FFBLD/libvpx-$vpxver
+
+rm -vf $PKGD/usr/lib${LIBDIRSUFFIX}/*.la
+find $PKGD/usr/lib${LIBDIRSUFFIX} -name "*.so*" -exec rm -vf {} \+
+
+mkdir -pv $PKGD/doc/vpx-$vpxver
+cp -av AUTHORS LICENSE PATENTS README $PKGD/doc/vpx-$vpxver
+
+cd $FFBLD
+
+tar xvf $FFSRC/libressl-$tlsver.tar.gz
+cd libressl-$tlsver
+chown -R root:root .
+find . -perm 777 -exec chmod 755 {} \+
+find . -perm 664 -exec chmod 644 {} \+
+
+CPPFLAGS="-I$PKGD/usr/include" \
+CFLAGS="$SCFLAGS" \
+CXXFLAGS="$SCXXFLAGS" \
+LDFLAGS="-L$PKGD/usr/lib -L$PKGD/usr/lib64 $SLDFLAGS" \
+./configure \
+  --prefix=/usr \
+  --libdir=/usr/lib${LIBDIRSUFFIX} \
+  --includedir=/usr/include \
+  --sysconfdir=/etc \
+  --localstatedir=/var \
+  --mandir=/usr/man \
+  --with-openssldir=/etc/libressl \
+  --enable-static \
+  --disable-shared \
+  --disable-tests \
+  --enable-nc  \
+  --with-gnu-ld 2>&1 | tee $OUTPUT/configure-libressl.log
+
+make -j$nprocr 2>&1 | tee $OUTPUT/make-libressl.log
+make install DESTDIR=$PKGD 2>&1 | tee $OUTPUT/install-libressl.log
+
+mkdir -pv $PKGD/doc/libressl
+cp -av COPYING README.md $PKGD/doc/libressl
+
+rm -vf $PKGD/usr/lib${LIBDIRSUFFIX}/*.la
+find $PKGD/usr/lib${LIBDIRSUFFIX} -name "*.so*" -exec rm -vf {} \+
+
+cd $FFBLD
+
+# Building libopenh264
+
+tar xvf $FFSRC/openh264-$ohver.tar.gz
+cd openh264-$ohver
+chown -R root:root .
+find . -perm 777 -exec chmod 755 {} \+
+find . -perm 664 -exec chmod 644 {} \+
+
+CPPFLAGS="-I$PKGD/usr/include" \
+CXXFLAGS="$SCXXFLAGS" \
+LDFLAGS="-L$PKGD/usr/lib -L$PKGD/usr/lib64 $SLDFLAGS" \
+make -j$nprocr -C $FFBLD/openh264-$ohver OS=linux ARCH="$ARCH" PREFIX="/usr" LIBDIR_NAME="lib64" SHAREDLIB_DIR="/usr/lib64"
+make DESTDIR="$PKGD" PREFIX="/usr" LIBDIR_NAME="lib64" SHAREDLIB_DIR="/usr/lib64" install
+install -Dm755 h264dec $PKGD/usr/bin/h264dec
+install -Dm755 h264enc $PKGD/usr/bin/h264enc
+
+mkdir -pv $PKGD/doc/openh264
+cp -a LICENSE CONTRIBUTORS RELEASES *.md  $PKGD/doc/openh264
+
+rm -vf $PKGD/usr/lib${LIBDIRSUFFIX}/*.la
+find $PKGD/usr/lib${LIBDIRSUFFIX} -name "*.so*" -exec rm -vf {} \+
+
+cd $FFBLD
+
+# Building libx264
+
+tar xvf $FFSRC/x264-master.tar.bz2
+cd x264-master
+chown -R root:root .
+find . -perm 777 -exec chmod 755 {} \+
+find . -perm 664 -exec chmod 644 {} \+
+
+CPPFLAGS="-I$PKGD/usr/include" \
+CFLAGS="$SCFLAGS" \
+CXXFLAGS="$SCXXFLAGS" \
+LDFLAGS="$SLDFLAGS -L$PKGD/usr/lib -L$PKGD/usr/lib64" \
+./configure \
+ --prefix=/usr \
+  --libdir=/usr/lib${LIBDIRSUFFIX} \
+  --enable-static \
+  --enable-pic \
+  --disable-cli \
+  --disable-gpl \
+  --disable-shared \
+  --bit-depth=all \
+  --chroma-format=all 2>&1 | tee $OUTPUT/configure-x264.log
+
+make -j$nprocr 2>&1 | tee $OUTPUT/make-x264.log
+make install DESTDIR=$PKGD 2>&1 | tee $OUTPUT/install-x264.log
+
+mkdir -pv $PKGD/doc/x264
+cp -a AUTHORS COPYING  $PKGD/doc/x264
+
+rm -vf $PKGD/usr/lib${LIBDIRSUFFIX}/*.la
+find $PKGD/usr/lib${LIBDIRSUFFIX} -name "*.so*" -exec rm -vf {} \+
+
+cd $FFBLD
+
+# Building libnuma aka numactl
+
+tar xvf $FFSRC/numactl-$numaver.tar.gz
+cd numactl-$numaver
+chown -R root:root .
+find . -perm 777 -exec chmod 755 {} \+
+find . -perm 664 -exec chmod 644 {} \+
+
+CPPFLAGS="-I$PKGD/usr/include" \
+CFLAGS="$SCFLAGS" \
+CXXFLAGS="$SCXXFLAGS" \
+LDFLAGS=" -L$PKGD/usr/lib -L$PKGD/usr/lib64 $SLDFLAGS" \
+./configure \
+  --prefix=/usr \
+  --libdir=/usr/lib${LIBDIRSUFFIX} \
+  --sysconfdir=/etc \
+  --localstatedir=/var \
+  --mandir=/usr/man \
+  --docdir=/usr/doc/$PRGNAM-$VERSION \
+  --enable-static=yes \
+  --enable-shared=no \
+  --with-gnu-ld   2>&1 | tee $OUTPUT/configure-numa.log
+
+make -j$nprocr 2>&1 | tee $OUTPUT/make-numa.log
+make install DESTDIR=$PKGD 2>&1 | tee $OUTPUT/install-numa.log
+
+mkdir -pv $PKGD/doc/numactl
+cp -av LICENSE.GPL2 LICENSE.LGPL2.1 $PKGD/doc/numactl
+
+rm -vf $PKGD/usr/lib${LIBDIRSUFFIX}/*.la
+find $PKGD/usr/lib${LIBDIRSUFFIX} -name "*.so*" -exec rm -vf {} \+
+
+cd $FFBLD
+
+# Building libx265
+# vmaf is not properly detected when building a static library and leads to a compile time
+# error with an undefined reference so turning it off.
+
+tar xvf $FFSRC/x265_$x265ver.tar.gz
+cd x265_$x265ver
+chown -R root:root .
+find . -perm 777 -exec chmod 755 {} \+
+find . -perm 664 -exec chmod 644 {} \+
+
+PKG_CONFIG_PATH=/tmp/SBo/dep/usr/lib64/pkgconfig cmake -B build -S $FFBLD/x265_$x265ver/source -G Ninja \
+    -DCMAKE_C_FLAGS:STRING="-I$PKGD/usr/include $SCFLAGS" \
+    -DCMAKE_CXX_FLAGS:STRING="-I$PKGD/usr/include $SCXXFLAGS" \
+    -DCMAKE_C_FLAGS_RELEASE:STRING="-I$PKGD/usr/include $SCFLAGS" \
+    -DCMAKE_CXX_FLAGS_RELEASE:STRING="-I$PKGD/usr/include $SCXXFLAGS" \
+    -DCMAKE_EXE_LINKER_FLAGS="-L$PKGD/usr/lib -L$PKGD/usr/lib64 $SLDFLAGS"  \
+    -DCMAKE_INSTALL_PREFIX=/usr \
+    -DLIB_INSTALL_DIR=lib${LIBDIRSUFFIX} \
+    -DBIN_INSTALL_DIR=/usr/bin \
+    -DENABLE_LIBNUMA:BOOL=ON \
+    -DENABLE_LIBVMAF:BOOL=OFF \
+    -DHIGH_BIT_DEPTH:BOOL=ON \
+    -DENABLE_HDR10_PLUS:BOOL=ON \
+    -DMAIN12=ON \
+    -DENABLE_SVT_HEVC:BOOL=OFF \
+    -DENABLE_ASSEMBLY:BOOL=OFF \
+    -DEXPORT_C_API:BOOL=ON \
+    -DENABLE_CLI:BOOL=ON \
+    -DENABLE_ALPHA:BOOL=ON \
+    -DENABLE_MULTIVIEW:BOOL=ON \
+    -DENABLE_SCC_EXT:BOOL=ON \
+    -DENABLE_SHARED:BOOL=OFF \
+    -DCMAKE_BUILD_TYPE=Release   2>&1 | tee $OUTPUT/configure-x265.log
+
+ninja -j$nprocr -C build  2>&1 | tee $OUTPUT/make-x265.log
+DESTDIR=$PKGD ninja -C build install  2>&1 | tee $OUTPUT/install-x265.log
+
+mkdir -pv $PKGD/doc/x265
+cp -av COPYING $PKGD/doc/x265
+
+rm -vf $PKGD/usr/lib${LIBDIRSUFFIX}/*.la
+find $PKGD/usr/lib${LIBDIRSUFFIX} -name "*.so*" -exec rm -vf {} \+
+
+cd $FFBLD
+
+# Building libilbc
+
+tar xvf $FFSRC/libilbc-3.0.4.tar.gz
+cd libilbc-3.0.4
+chown -R root:root .
+find . -perm 777 -exec chmod 755 {} \+
+find . -perm 664 -exec chmod 644 {} \+
+ABSEILVER=20211102.0
+tar xvf $FFSRC/abseil-cpp-$ABSEILVER.tar.gz \
+  --transform="s|^abseil-cpp-$ABSEILVER|abseil-cpp|" \
+  --show-transformed-names
+
+cmake -B build -S $FFBLD/libilbc-3.0.4 \
+    -DCMAKE_C_FLAGS:STRING="-I$PKGD/usr/include $SCFLAGS" \
+    -DCMAKE_CXX_FLAGS:STRING="-I$PKGD/usr/include $SCXXFLAGS" \
+    -DCMAKE_C_FLAGS_RELEASE:STRING="-I$PKGD/usr/include $SCFLAGS" \
+    -DCMAKE_CXX_FLAGS_RELEASE:STRING="-I$PKGD/usr/include $SCXXFLAGS" \
+    -DCMAKE_EXE_LINKER_FLAGS="-L$PKGD/usr/lib -L$PKGD/usr/lib64 $SLDFLAGS"  \
+    -DCMAKE_INSTALL_PREFIX=/usr \
+    -DCMAKE_INSTALL_BINDIR=/usr/bin \
+    -DCMAKE_INSTALL_LIBDIR=/usr/lib64 \
+    -DCMAKE_INSTALL_INCLUDEDIR=/usr/include \
+    -DBUILD_SHARED_LIBS=OFF \
+    -DCMAKE_BUILD_TYPE=Release
+
+cmake --build build --parallel $nprocr 2>&1 | tee -a $OUTPUT/make-libilbc.log
+DESTDIR=$PKGD cmake --install build 2>&1 | tee -a $OUTPUT/install-libilbc.log
+
+mkdir -pv $PKGD/doc/libilbc
+cp -av AUTHORS COPYING PATENTS README.md $PKGD/doc/libilbc
+
+rm -vf $PKGD/usr/lib${LIBDIRSUFFIX}/*.la
+find $PKGD/usr/lib${LIBDIRSUFFIX} -name "*.so*" -exec rm -vf {} \+
+
+cd $FFBLD
+
+# Building libsoxr make sure you have removed the stock ffmpeg that
+# comes with slackware.
+
+tar xvf $FFSRC/soxr-0.1.3-Source.tar.xz
+cd soxr-0.1.3-Source
+chown -R root:root .
+find . -perm 777 -exec chmod 755 {} \+
+find . -perm 664 -exec chmod 644 {} \+
+
+# Patch from eric's ffmpeg slackbuild
+patch -p1 --verbose < $CWD/patches/soxr_expose_privatelibs.patch
+
+cmake -B build -S $FFBLD/soxr-0.1.3-Source \
+    -DCMAKE_C_FLAGS:STRING="-I$PKGD/usr/include $SCFLAGS" \
+    -DCMAKE_CXX_FLAGS:STRING="-I$PKGD/usr/include $SCXXFLAGS" \
+    -DCMAKE_C_FLAGS_RELEASE:STRING="-I$PKGD/usr/include $SCFLAGS" \
+    -DCMAKE_CXX_FLAGS_RELEASE:STRING="-I$PKGD/usr/include $SCXXFLAGS" \
+    -DCMAKE_EXE_LINKER_FLAGS="-L$PKGD/usr/lib -L$PKGD/usr/lib64 $SLDFLAGS"  \
+    -DCMAKE_INSTALL_PREFIX=/usr \
+    -DCMAKE_INSTALL_BINDIR=/usr/bin \
+    -DCMAKE_INSTALL_LIBDIR=/usr/lib64 \
+    -DCMAKE_INSTALL_INCLUDEDIR=/usr/include \
+    -DBUILD_SHARED_LIBS=OFF \
+    -DBUILD_TESTS=OFF \
+    -DWITH_DEV_TRACE=OFF \
+    -DBUILD_EXAMPLES=OFF \
+    -DBUILD_TESTS=OFF \
+    -DWITH_LSR_BINDINGS=OFF \
+    -DWITH_OPENMP=OFF \
+    -DWITH_AVFFT=ON \
+    -DDOC_INSTALL_DIR=/usr/doc \
+    -DCMAKE_BUILD_TYPE=Release
+
+cmake --build build --parallel $nprocr 2>&1 | tee -a $OUTPUT/make-soxr.log
+DESTDIR=$PKGD cmake --install build 2>&1 | tee -a $OUTPUT/install-soxr.log
+
+#find "$PKGD/usr/lib" -name "libsoxr-lsr.a" | xargs strip --strip-unneeded --remove-section=.comment --remove-section=.note
+#find "$PKGD/usr/lib" -name "libsoxr.a" | xargs strip --strip-unneeded --remove-section=.comment --remove-section=.note
+
+mkdir -pv $PKGD/doc/soxr
+cp -av AUTHORS COPYING.LGPL LICENCE README $PKGD/doc/soxr
+
+rm -vf $PKGD/usr/lib${LIBDIRSUFFIX}/*.la
+find $PKGD/usr/lib${LIBDIRSUFFIX} -name "*.so*" -exec rm -vf {} \+
+
+cd $FFBLD
+
+# Building libmodplug
+
+tar xvf $FFSRC/libmodplug-0.8.9.0.tar.gz
+cd libmodplug-0.8.9.0
+chown -R root:root .
+find . -perm 777 -exec chmod 755 {} \+
+find . -perm 664 -exec chmod 644 {} \+
+
+# From SBo
+# Fix end-of-line encoding.
+for i in ChangeLog; do
+  sed -e 's/\r//' $i > ${i}.new
+  touch -r $i ${i}.new
+  mv ${i}.new $i
+done
+
+patch -p1 --verbose < $CWD/patches/libmodplug-0.8.4-timiditypaths.patch
+
+CPPFLAGS="-I$PKGD/usr/include" \
+CFLAGS="$SCFLAGS" \
+CXXFLAGS="$SCXXFLAGS" \
+LDFLAGS=" -L$PKGD/usr/lib -L$PKGD/usr/lib64 $SLDFLAGS" \
+./configure \
+  --prefix=/usr \
+  --libdir=/usr/lib${LIBDIRSUFFIX} \
+  --sysconfdir=/etc \
+  --localstatedir=/var \
+  --mandir=/usr/man \
+  --docdir=/usr/doc/modplug \
+  --enable-static=yes \
+  --enable-shared=no \
+  --disable-silent-rules
+
+make -j$nprocr 2>&1 | tee -a $OUTPUT/make-modplug.log
+make install DESTDIR=$PKGD 2>&1 | tee -a $OUTPUT/install-modplug.log
+
+mkdir -pv $PKGD/doc/modplug
+cp -av AUTHORS COPYING $PKGD/doc/modplug
+#cp -av $PKGD/usr/doc/modplug/example $PKGD/doc/modplug
+
+rm -vf $PKGD/usr/lib${LIBDIRSUFFIX}/*.la
+find $PKGD/usr/lib${LIBDIRSUFFIX} -name "*.so*" -exec rm -vf {} \+
+
+cd $FFBLD
+
+# Building  zeromq
+
+tar xvf $FFSRC/zeromq-4.3.5.tar.gz
+cd zeromq-4.3.5
+chown -R root:root .
+find . -perm 777 -exec chmod 755 {} \+
+find . -perm 664 -exec chmod 644 {} \+
+
+CPPFLAGS="-I$PKGD/usr/include" \
+CFLAGS="$SCFLAGS" \
+CXXFLAGS="$SCXXFLAGS" \
+LDFLAGS=" -L$PKGD/usr/lib -L$PKGD/usr/lib64 $SLDFLAGS" \
+./configure \
+  --prefix=/usr \
+  --libdir=/usr/lib${LIBDIRSUFFIX} \
+  --sysconfdir=/etc \
+  --localstatedir=/var \
+  --mandir=/usr/man \
+  --docdir=/usr/doc/zmq \
+  --enable-static=yes \
+  --enable-shared=no \
+  --disable-werror
+
+make -j$nprocr 2>&1 | tee -a $OUTPUT/make-zmq.log
+make install DESTDIR=$PKGD 2>&1 | tee -a $OUTPUT/install-zmq.log
+
+mkdir -pv $PKGD/doc/zmq
+cp -av AUTHORS LICENSE $PKGD/doc/zmq
+
+rm -vf $PKGD/usr/lib${LIBDIRSUFFIX}/*.la
+find $PKGD/usr/lib${LIBDIRSUFFIX} -name "*.so*" -exec rm -vf {} \+
+
+cd $FFBLD
+
+# Building zvbi
+
+tar xvf $FFSRC/zvbi-0.2.35.tar.bz2
+cd zvbi-0.2.35
+chown -R root:root .
+find . -perm 777 -exec chmod 755 {} \+
+find . -perm 664 -exec chmod 644 {} \+
+
+CPPFLAGS="-I$PKGD/usr/include" \
+CFLAGS="$SCFLAGS" \
+CXXFLAGS="$SCXXFLAGS" \
+LDFLAGS=" -L$PKGD/usr/lib -L$PKGD/usr/lib64 $SLDFLAGS" \
+./configure \
+  --prefix=/usr \
+  --libdir=/usr/lib${LIBDIRSUFFIX} \
+  --sysconfdir=/etc \
+  --localstatedir=/var \
+  --mandir=/usr/man \
+  --docdir=/usr/doc/zvbi \
+  --enable-static=yes \
+  --enable-shared=no
+
+make -j$nprocr 2>&1 | tee -a $OUTPUT/make-zvbi.log
+make install DESTDIR=$PKGD 2>&1 | tee -a $OUTPUT/install-zvbi.log
+
+mkdir -pv $PKGD/doc/zvbi
+cp -av AUTHORS COPYING COPYING.LIB $PKGD/doc/zvbi
+
+rm -vf $PKGD/usr/lib${LIBDIRSUFFIX}/*.la
+find $PKGD/usr/lib${LIBDIRSUFFIX} -name "*.so*" -exec rm -vf {} \+
+
+cd $FFBLD
+
+# Building libgme
+
+tar xvf $FFSRC/game-music-emu-$gmever.tar.xz
+cd game-music-emu-$gmever
+chown -R root:root .
+find . -perm 777 -exec chmod 755 {} \+
+find . -perm 664 -exec chmod 644 {} \+
+
+# From Eric's ffmpeg slackbuild
+# Fix 64bit installation path for the static libary:
+sed -i gme/CMakeLists.txt -e 's#DESTINATION lib #DESTINATION lib${LIB_SUFFIX} #'
+
+cmake -B build -S $FFBLD/game-music-emu-$gmever \
+    -DCMAKE_C_FLAGS:STRING="-I$PKGD/usr/include $SCFLAGS" \
+    -DCMAKE_CXX_FLAGS:STRING="-I$PKGD/usr/include $SCXXFLAGS" \
+    -DCMAKE_C_FLAGS_RELEASE:STRING="-I$PKGD/usr/include $SCFLAGS" \
+    -DCMAKE_CXX_FLAGS_RELEASE:STRING=" -I$PKGD/usr/include $SCXXFLAGS" \
+    -DCMAKE_EXE_LINKER_FLAGS="$SLDFLAGS -L$PKGD/usr/lib -L$PKGD/usr/lib64"  \
+    -DCMAKE_INSTALL_PREFIX=/usr \
+    -DCMAKE_INSTALL_LIBDIR=lib${LIBDIRSUFFIX} \
+    -DLIB_SUFFIX=${LIBDIRSUFFIX} \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DBUILD_SHARED_LIBS=OFF \
+    -DENABLE_UBSAN=OFF
+
+cmake --build build --parallel $nprocr 2>&1 | tee $OUTPUT/make-gme.log
+DESTDIR=$PKGD cmake --install build 2>&1 | tee $OUTPUT/install-gme.log
+
+mkdir -pv $PKGD/doc/gme-$gmever
+cp -a license.gpl2.txt license.txt $PKGD/doc/gme-$gmever
+
+rm -vf $PKGD/usr/lib${LIBDIRSUFFIX}/*.la
+find $PKGD/usr/lib${LIBDIRSUFFIX} -name "*.so*" -exec rm -vf {} \+
+
+cd $FFBLD
+
+# Building libudfread
+
+tar xvf $FFSRC/libudfread-master.tar.gz
+cd libudfread-master
+chown -R root:root .
+find . -perm 777 -exec chmod 755 {} \+
+find . -perm 664 -exec chmod 644 {} \+
+./bootstrap
+CPPFLAGS="-I$PKGD/usr/include" \
+CFLAGS="$SCFLAGS" \
+CXXFLAGS="$SCXXFLAGS" \
+LDFLAGS="$SLDFLAGS -L$PKGD/usr/lib -L$PKGD/usr/lib64" \
+./configure \
+  --prefix=/usr \
+  --libdir=/usr/lib${LIBDIRSUFFIX} \
+  --sysconfdir=/etc \
+  --localstatedir=/var \
+  --mandir=/usr/man \
+  --docdir=/usr/doc/libudfread \
+  --enable-static=yes \
+  --enable-shared=no \
+  --with-gnu-ld 2>&1 | tee $OUTPUT/configure-udfread.log
+
+make -j$nprocr 2>&1 | tee $OUTPUT/make-udfread.log
+make install DESTDIR=$PKGD 2>&1 | tee $OUTPUT/install-udfread.log
+
+mkdir -pv $PKGD/doc/udfread
+cp -av COPYING $PKGD/doc/udfread
+
+rm -vf $PKGD/usr/lib${LIBDIRSUFFIX}/*.la
+find $PKGD/usr/lib${LIBDIRSUFFIX} -name "*.so*" -exec rm -vf {} \+
+
+cd $FFBLD
+
+# Building libxml2
+
+tar xvf $FFSRC/libxml2-$xml2ver.tar.xz
+cd libxml2-$xml2ver
+chown -R root:root .
+find . -perm 777 -exec chmod 755 {} \+
+find . -perm 664 -exec chmod 644 {} \+
+
+PYTHON3LIB=$( python3 -c 'from distutils.sysconfig import get_python_lib; print(get_python_lib())' )
+patch -p1 --verbose < $CWD/patches/libxml2-2.12.0-python3-unicode-errors.patch || exit 1
+CPPFLAGS="-I$PKGD/usr/include" \
+CFLAGS="$SCFLAGS" \
+CXXFLAGS="$SCXXFLAGS" \
+LDFLAGS="-L$PKGD/usr/lib -L$PKGD/usr/lib64 $SLDFLAGS" \
+PKG_CONFIG_PATH="$PKGD/usr/lib64/pkgconfig" \
+Z_CFLAGS="-I$PKGD/usr/include" \
+Z_LIBS="-L$PKGD/usr/lib64 -lz" \
+LZMA_CFLAGS="-I$PKGD/usr/include -DLZMA_API_STATIC" \
+LZMA_LIBS="-L$PKGD/usr/lib64 -llzma -pthread -lpthread" \
+./configure \
+  --prefix=/usr \
+  --libdir=/usr/lib${LIBDIRSUFFIX} \
+  --bindir=/usr/bin \
+  --docdir=/usr/doc/libxml2-$xml2ver \
+  --enable-static \
+  --disable-shared \
+  --without-debug \
+  --with-history  \
+  --without-python \
+  --with-legacy \
+  --with-ftp \
+  --without-icu \
+  --without-run-debug \
+  --without-mem-debug \
+  --without-thread-alloc \
+  --with-gnu-ld 2>&1 | tee $OUTPUT/configure-libxml2.log
+
+make -j$nprocr 2>&1 | tee $OUTPUT/make-libxml2.log
+make install DESTDIR=$PKGD  2>&1 | tee $OUTPUT/install-libxml2.log
+
+mkdir -pv $PKGD/doc/libxml2-$xml2ver
+cp -av Copyright $PKGD/doc/libxml2-$xml2ver
+
+rm -vf $PKGD/usr/lib${LIBDIRSUFFIX}/*.la
+find $PKGD/usr/lib${LIBDIRSUFFIX} -name "*.so*" -exec rm -vf {} \+
+
+cd $FFBLD
+
+# Building libbluray
+
+tar xvf $FFSRC/libbluray-master.tar.gz
+cd libbluray-master
+chown -R root:root .
+find . -perm 777 -exec chmod 755 {} \+
+find . -perm 664 -exec chmod 644 {} \+
+
+# from Alienbob's vlc slackbuild
+patch -p1 --verbose < $CWD/patches/bluray_bdjo-data-header.patch
+
+# Fix 64bit library path from Alienbob's vlc slackbuild:
+sed -i -e "s|/usr/lib/libbluray|/usr/lib${LIBDIRSUFFIX}/libbluray|" src/libbluray/bdj/bdj.c
+
+./bootstrap
+CPPFLAGS="-I$PKGD/usr/include" \
+CFLAGS="$SCFLAGS" \
+CXXFLAGS="$SCXXFLAGS" \
+LDFLAGS="$SLDFLAGS -L$PKGD/usr/lib -L$PKGD/usr/lib64" \
+PKG_CONFIG_PATH="$PKGD/usr/lib64/pkgconfig" \
+LIBXML2_CFLAGS="-I$PKGD/usr/include/libxml2" \
+LIBXML2_LIBS="-L$PKGD/usr/lib64 -lz -L$PKGD/usr/lib64 -llzma -pthread -lpthread -lm -L$PKGD/usr/lib64 -lxml2" \
+FT2_CFLAGS="-I$PKGD/usr/include/freetype2" \
+FT2_LIBS="-L$PKGD/usr/lib64 -lfreetype" \
+FONTCONFIG_CFLAGS="-I$PKGD/usr/include -pthread" \
+FONTCONFIG_LIBS="-L$PKGD/usr/lib64 -lfontconfig -pthread" \
+LIBUDFREAD_CFLAGS="-I$PKGD/usr/include" \
+LIBUDFREAD_LIBS="-L$PKGD/usr/lib64 -ludfread" \
+./configure \
+  --prefix=/usr \
+  --libdir=/usr/lib${LIBDIRSUFFIX} \
+  --sysconfdir=/etc \
+  --localstatedir=/var \
+  --mandir=/usr/man \
+  --docdir=/usr/doc/libudfread \
+  --enable-static=yes \
+  --enable-shared=no \
+  --disable-examples \
+  --disable-doxygen-doc \
+  --disable-doxygen-dot \
+  --disable-doxygen-man \
+  --disable-doxygen-rtf \
+  --disable-doxygen-xml  \
+  --disable-doxygen-chm \
+  --disable-doxygen-chi  \
+  --disable-doxygen-html  \
+  --disable-doxygen-ps \
+  --disable-doxygen-pdf \
+  --enable-bdjava-jar \
+  --with-libxml2 \
+  --with-freetype \
+  --with-fontconfig \
+  --with-gnu-ld 2>&1 | tee $OUTPUT/configure-bluray.log
+
+make -j$nprocr  2>&1 | tee $OUTPUT/make-bluray.log
+make install DESTDIR=$PKGD  2>&1 | tee $OUTPUT/install-bluray.log
+
+mkdir -pv $PKGD/doc/bluray
+cp -av COPYING $PKGD/doc/bluray
+
+rm -vf $PKGD/usr/lib${LIBDIRSUFFIX}/*.la
+find $PKGD/usr/lib${LIBDIRSUFFIX} -name "*.so*" -exec rm -vf {} \+
+
+cd $FFBLD
+
+# Building libbs2b
+
+tar xvf $FFSRC/libbs2b-3.1.0.tar.bz2
+cd libbs2b-3.1.0
+chown -R root:root .
+find . -perm 777 -exec chmod 755 {} \+
+find . -perm 664 -exec chmod 644 {} \+
+CPPFLAGS="-I$PKGD/usr/include" \
+CFLAGS="$SCFLAGS" \
+CXXFLAGS="$SCXXFLAGS" \
+LDFLAGS="-ldl -lm -L$PKGD/usr/lib -L$PKGD/usr/lib64 $SLDFLAGS" \
+PKG_CONFIG_PATH="$PKGD/usr/lib64/pkgconfig" \
+./configure \
+  --prefix=/usr \
+  --libdir=/usr/lib${LIBDIRSUFFIX} \
+  --sysconfdir=/etc \
+  --localstatedir=/var \
+  --mandir=/usr/man \
+  --docdir=/usr/doc/$PRGNAM-$VERSION \
+  --enable-shared=no \
+  --enable-static=yes 2>&1 | tee $OUTPUT/configure-bs2b.log
+
+make -j$nprocr 2>&1 | tee $OUTPUT/make-bs2b.log
+make install DESTDIR=$PKGD 2>&1 | tee $OUTPUT/install-bs2b.log
+
+mkdir -pv $PKGD/doc/bs2b
+cp -av  AUTHORS COPYING $PKGD/doc/bs2b
+
+rm -vf $PKGD/usr/lib${LIBDIRSUFFIX}/*.la
+find $PKGD/usr/lib${LIBDIRSUFFIX} -name "*.so*" -exec rm -vf {} \+
+
+cd $FFBLD
+
+# Building deps from Git and Svn
+# version commands for the git builds are originally from arch linux pkgbuilds adapted to suit SBo style.
+# Building libshine
+
+git clone https://github.com/toots/shine
+cd shine
+shinever=$(expr $(printf "%s_%s" "$(git show -s --format=%ci | cut -d ' ' -f 1 | sed 's/-//g')" "$(git rev-parse --short HEAD)"))
+chown -R root:root .
+find . -perm 777 -exec chmod 755 {} \+
+find . -perm 664 -exec chmod 644 {} \+
+./bootstrap
+CPPFLAGS="-I$PKGD/usr/include" \
+CFLAGS="$SCFLAGS" \
+CXXFLAGS="$SCXXFLAGS" \
+LDFLAGS=" -L$PKGD/usr/lib -L$PKGD/usr/lib64 $SLDFLAGS" \
+./configure \
+  --prefix=/usr \
+  --libdir=/usr/lib${LIBDIRSUFFIX} \
+  --sysconfdir=/etc \
+  --localstatedir=/var \
+  --mandir=/usr/man \
+  --docdir=/usr/doc/shine-$shinever \
+  --enable-static \
+  --disable-shared
+
+make -j$nprocr 2>&1 | tee $OUTPUT/make-shine.log
+make install DESTDIR=$PKGD 2>&1 | tee $OUTPUT/install-shine.log
+
+mkdir -pv $PKGD/doc/shine-$shinever
+cp -a README.md COPYING $PKGD/doc/shine-$shinever
+
+rm -vf $PKGD/usr/lib${LIBDIRSUFFIX}/*.la
+find $PKGD/usr/lib${LIBDIRSUFFIX} -name "*.so*" -exec rm -vf {} \+
+
+cd $FFBLD
+
+# Building xeve
+
+git clone https://github.com/mpeg5/xeve
+cd xeve
+xevever=$(expr $(printf "%s_%s" "$(git show -s --format=%ci | cut -d ' ' -f 1 | sed 's/-//g')" "$(git rev-parse --short HEAD)"))
+chown -R root:root .
+find . -perm 777 -exec chmod 755 {} \+
+find . -perm 664 -exec chmod 644 {} \+
+
+cmake -B build -S $FFBLD/xeve -G Ninja \
+    -DCMAKE_C_FLAGS:STRING="-I$PKGD/usr/include $SCFLAGS" \
+    -DCMAKE_CXX_FLAGS:STRING="-I$PKGD/usr/include $SCXXFLAGS" \
+    -DCMAKE_EXE_LINKER_FLAGS="-L$PKGD/usr/lib -L$PKGD/usr/lib64 $SLDFLAGS"  \
+    -DCMAKE_INSTALL_PREFIX=/usr \
+    -DCMAKE_INSTALL_LIBDIR=/usr/lib${LIBDIRSUFFIX} \
+    -DBUILD_SHARED_LIBS:BOOL=OFF \
+    -DCMAKE_BUILD_TYPE=Release
+
+cmake --build build --parallel $nprocr 2>&1 | tee $OUTPUT/make-xeve.log
+DESTDIR=$PKGD cmake --install build 2>&1 | tee $OUTPUT/install-xeve.log
+
+mv -v $PKGD/usr/lib${LIBDIRSUFFIX}/xeve/*  $PKGD/usr/lib${LIBDIRSUFFIX}
+cp -av $PKGD/usr/include/xeve/* $PKGD/usr/include
+
+mkdir -pv $PKGD/doc/xeve-$xevever
+cp -av COPYING README.md $PKGD/doc/xeve-$xevever
+
+rm -vf $PKGD/usr/lib${LIBDIRSUFFIX}/*.la
+find $PKGD/usr/lib${LIBDIRSUFFIX} -name "*.so*" -exec rm -vf {} \+
+
+cd $FFBLD
+
+# Building Xevd
+
+git clone https://github.com/mpeg5/xevd
+cd xevd
+xevdver=$(expr $(printf "%s_%s" "$(git show -s --format=%ci | cut -d ' ' -f 1 | sed 's/-//g')" "$(git rev-parse --short HEAD)"))
+chown -R root:root .
+find . -perm 777 -exec chmod 755 {} \+
+find . -perm 664 -exec chmod 644 {} \+
+
+cmake -B build -S $FFBLD/xevd -G Ninja \
+    -DCMAKE_C_FLAGS:STRING="-I$PKGD/usr/include $SCFLAGS" \
+    -DCMAKE_CXX_FLAGS:STRING="-I$PKGD/usr/include $SCXXFLAGS" \
+    -DCMAKE_EXE_LINKER_FLAGS="-L$PKGD/usr/lib -L$PKGD/usr/lib64 $SLDFLAGS"  \
+    -DCMAKE_INSTALL_PREFIX=/usr \
+    -DCMAKE_INSTALL_LIBDIR=/usr/lib${LIBDIRSUFFIX} \
+    -DBUILD_SHARED_LIBS:BOOL=OFF \
+    -DCMAKE_BUILD_TYPE=Release
+
+cmake --build build --parallel $nprocr 2>&1 | tee $OUTPUT/make-xevd.log
+DESTDIR=$PKGD cmake --install build 2>&1 | tee $OUTPUT/install-xevd.log
+
+mv -v $PKGD/usr/lib${LIBDIRSUFFIX}/xevd/*  $PKGD/usr/lib${LIBDIRSUFFIX}
+cp -av $PKGD/usr/include/xevd/* $PKGD/usr/include
+
+mkdir -pv $PKGD/doc/xevd-$xevdver
+cp -av COPYING README.md $PKGD/doc/xevd-$xevdver
+
+rm -vf $PKGD/usr/lib${LIBDIRSUFFIX}/*.la
+find $PKGD/usr/lib${LIBDIRSUFFIX} -name "*.so*" -exec rm -vf {} \+
+
+cd $FFBLD
+
+# Building liblc3
+git clone https://github.com/google/liblc3
+cd liblc3
+lc3ver=$(expr $(printf "%s_%s" "$(git show -s --format=%ci | cut -d ' ' -f 1 | sed 's/-//g')" "$(git rev-parse --short HEAD)"))
+chown -R root:root .
+find . -perm 777 -exec chmod 755 {} \+
+find . -perm 664 -exec chmod 644 {} \+
+
+CFLAGS="-I$PKGD/usr/include $SCFLAGS" \
+CXXFLAGS="-I$PKGD/usr/include $SCXXFLAGS" \
+LDFLAGS="-L$PKGD/usr/lib64 -L$PKGD/usr/lib $SLDFLAGS" meson build \
+    -Dbuildtype=release \
+    -Dlibdir=/usr/lib${LIBDIRSUFFIX} \
+    -Dlocalstatedir=/var \
+    -Dmandir=/usr/man \
+    -Dprefix=/usr \
+    -Dsysconfdir=/etc \
+    -Ddefault_library=static \
+    -Dstrip=true \
+    -Dtools=true
+
+ninja -j$nprocr -C build 2>&1 | tee $OUTPUT/make-lc3.log
+DESTDIR=$PKGD ninja -C build  install 2>&1 | tee $OUTPUT/install-lc3.log
+
+mkdir -pv $PKGD/doc/liblc3-$lc3ver
+cp -av CONTRIBUTING.md README.md LICENSE $PKGD/doc/liblc3-$lc3ver
+
+rm -vf $PKGD/usr/lib${LIBDIRSUFFIX}/*.la
+find $PKGD/usr/lib${LIBDIRSUFFIX} -name "*.so*" -exec rm -vf {} \+
+
+cd $FFBLD
+
+# Building Xavs2
+# Xavs2 supports only 8 bit depth only, higher bit depths results in compile time error.
+
+git clone https://github.com/pkuvcl/xavs2.git
+cd xavs2
+chown -R root:root .
+find . -perm 777 -exec chmod 755 {} \+
+find . -perm 664 -exec chmod 644 {} \+
+cd build/linux/
+CPPFLAGS="-I$PKGD/usr/include" \
+CFLAGS="$SCFLAGS" \
+CXXFLAGS="$SCXXFLAGS" \
+LDFLAGS="-L$PKGD/usr/lib -L$PKGD/usr/lib64 $SLDFLAGS" \
+./configure \
+  --prefix=/usr \
+  --libdir=/usr/lib${LIBDIRSUFFIX} \
+  --bindir=/usr/bin \
+  --enable-static \
+  --bit-depth=8 \
+  --chroma-format=all \
+  --enable-strip \
+  --disable-shared \
+  --disable-asm
+
+make -j$nprocr 2>&1 | tee $OUTPUT/make-xavs2.log
+make install DESTDIR=$PKGD 2>&1 | tee $OUTPUT/install-xavs2.log
+
+cd ../..
+
+mkdir -pv $PKGD/doc/xavs2-1.4
+cp -a COPYING README.md  $PKGD/doc/xavs2-1.4
+
+rm -vf $PKGD/usr/lib${LIBDIRSUFFIX}/*.la
+find $PKGD/usr/lib${LIBDIRSUFFIX} -name "*.so*" -exec rm -vf {} \+
+
+cd $FFBLD
+
+# Building davs2
+
+git clone https://github.com/pkuvcl/davs2.git
+cd davs2
+chown -R root:root .
+find . -perm 777 -exec chmod 755 {} \+
+find . -perm 664 -exec chmod 644 {} \+
+cd build/linux/
+CPPFLAGS="-I$PKGD/usr/include" \
+CXXFLAGS="$SCXXFLAGS" \
+LDFLAGS="-L$PKGD/usr/lib -L$PKGD/usr/lib64 $SLDFLAGS" \
+./configure \
+  --prefix=/usr \
+  --libdir=/usr/lib${LIBDIRSUFFIX} \
+  --disable-shared \
+  --disable-debug \
+  --disable-asm \
+  --enable-static \
+  --enable-strip \
+  --bit-depth='8' \
+  --chroma-format='all' \
+  --extra-cflags="-I$PKGD/usr/include $SCXXFLAGS" \
+  --extra-ldflags="-L$PKGD/usr/lib -L$PKGD/usr/lib64 $SLDFLAGS"
+
+make -j$nprocr  2>&1 | tee $OUTPUT/make-davs2.log
+make install DESTDIR=$PKGD  2>&1 | tee $OUTPUT/install-davs2.log
+
+cd ../..
+
+mkdir -pv $PKGD/doc/davs2
+cp -a COPYING README.md  $PKGD/doc/davs2
+
+rm -vf $PKGD/usr/lib${LIBDIRSUFFIX}/*.la
+find $PKGD/usr/lib${LIBDIRSUFFIX} -name "*.so*" -exec rm -vf {} \+
+
+cd $FFBLD
+
+# Building Uavs3d
+
+git clone https://github.com/uavs3/uavs3d.git
+cd uavs3d
+chown -R root:root .
+find . -perm 777 -exec chmod 755 {} \+
+find . -perm 664 -exec chmod 644 {} \+
+
+mkdir -pv build/linux
+
+cmake -B build/linux -S $FFBLD/uavs3d \
+        -DCMAKE_C_FLAGS:STRING="-I$PKGD/usr/include $SCFLAGS" \
+        -DCMAKE_CXX_FLAGS:STRING="-I$PKGD/usr/include $SCXXFLAGS" \
+        -DCMAKE_EXE_LINKER_FLAGS="-L$PKGD/usr/lib -L$PKGD/usr/lib64 $SLDFLAGS"  \
+        -DCMAKE_INSTALL_PREFIX:PATH=/usr \
+        -DCMAKE_INSTALL_LIB_DIR:PATH=/usr/lib${LIBDIRSUFFIX} \
+        -DBUILD_SHARED_LIBS:BOOL=OFF \
+        -DCOMPILE_10BIT=1
+
+cmake --build  build/linux 2>&1 | tee $OUTPUT/make-uavs3d.log
+
+make -C $FFBLD/uavs3d/build/linux DESTDIR="$PKGD" install 2>&1 | tee $OUTPUT/install-uavs3d.log
+
+install -D -m755 $FFBLD/uavs3d/build/linux/uavs3dec -t "$PKGD/usr/bin"
+
+mkdir -pv $PKGD/doc/uavs3d
+cp -av COPYING README.md  $PKGD/doc/uavs3d
+
+rm -vf $PKGD/usr/lib${LIBDIRSUFFIX}/*.la
+find $PKGD/usr/lib${LIBDIRSUFFIX} -name "*.so*" -exec rm -vf {} \+
+
+cd $FFBLD
+
+# Building Liblensfun
+
+git clone https://github.com/lensfun/lensfun
+cd lensfun
+lensver=$(expr $(printf "%s_%s" "$(git show -s --format=%ci | cut -d ' ' -f 1 | sed 's/-//g')" "$(git rev-parse --short HEAD)"))
+chown -R root:root .
+find . -perm 777 -exec chmod 755 {} \+
+find . -perm 664 -exec chmod 644 {} \+
+
+cmake -B build -S $FFBLD/lensfun -G Ninja \
+    -DCMAKE_C_FLAGS:STRING="-I$PKGD/usr/include $SCFLAGS" \
+    -DCMAKE_CXX_FLAGS:STRING="-I$PKGD/usr/include $SCXXFLAGS" \
+    -DCMAKE_EXE_LINKER_FLAGS="-L$PKGD/usr/lib -L$PKGD/usr/lib64 $SLDFLAGS"  \
+    -DCMAKE_INSTALL_PREFIX=/usr \
+    -DCMAKE_INSTALL_LIBDIR=/usr/lib${LIBDIRSUFFIX} \
+    -DCMAKE_CXX_EXTENSIONS:BOOL=ON \
+    -DBUILD_LENSTOOL:BOOL=ON \
+    -DINSTALL_PYTHON_MODULE=OFF \
+    -DBUILD_STATIC:BOOL=ON \
+    -DBUILD_SHARED_LIBS:BOOL=OFF \
+    -DCMAKE_BUILD_TYPE=Release
+
+cmake --build build 2>&1 | tee $OUTPUT/make-lensfun.log
+DESTDIR=$PKGD cmake --install build 2>&1 | tee $OUTPUT/install-lensfun.log
+
+cp -av $PKGD/usr/include/lensfun/*  $PKGD/usr/include
+
+mkdir -pv $PKGD/doc/lensfun-$lensver
+cp -a COPYING COPYING.LESSER README.md $PKGD/doc/lensfun-$lensver
+
+rm -vf $PKGD/usr/lib${LIBDIRSUFFIX}/*.la
+find $PKGD/usr/lib${LIBDIRSUFFIX} -name "*.so*" -exec rm -vf {} \+
+
+cd $FFBLD
+
+# Building libklvanc
+
+git clone https://github.com/stoth68000/libklvanc.git
+cd libklvanc
+vancver=$(expr $(printf "%s_%s" "$(git show -s --format=%ci | cut -d ' ' -f 1 | sed 's/-//g')" "$(git rev-parse --short HEAD)"))
+chown -R root:root .
+find . -perm 777 -exec chmod 755 {} \+
+find . -perm 664 -exec chmod 644 {} \+
+
+./autogen.sh --build
+CPPFLAGS="-I$PKGD/usr/include" \
+CFLAGS="$SCFLAGS" \
+CXXFLAGS="$SCXXFLAGS" \
+LDFLAGS="-L$PKGD/usr/lib -L$PKGD/usr/lib64 $SLDFLAGS" \
+./configure \
+  --prefix=/usr \
+  --libdir=/usr/lib${LIBDIRSUFFIX} \
+  --sysconfdir=/etc \
+  --localstatedir=/var \
+  --mandir=/usr/man \
+  --docdir=/usr/doc/libklvanc-$vancver \
+  --with-gnu-ld  \
+  --disable-debug \
+  --disable-shared \
+  --enable-static
+
+make -j$nprocr 2>&1 | tee $OUTPUT/make-libklvanc.log
+make -C $FFBLD/libklvanc DESTDIR=$PKGD install  2>&1 | tee $OUTPUT/install-libklvanc.log
+
+mkdir -pv $PKGD/doc/libklvanc-$vancver
+cp -av README.md lgpl-2.1.txt $PKGD/doc/libklvanc-$vancver
+
+rm -vf $PKGD/usr/lib${LIBDIRSUFFIX}/*.la
+find $PKGD/usr/lib${LIBDIRSUFFIX} -name "*.so*" -exec rm -vf {} \+
+
+cd $FFBLD
+
+# Building libvidstab
+
+git clone https://github.com/georgmartius/vid.stab.git
+cd vid.stab
+vidstabver=$(expr $(printf "%s_%s" "$(git show -s --format=%ci | cut -d ' ' -f 1 | sed 's/-//g')" "$(git rev-parse --short HEAD)"))
+chown -R root:root .
+find . -perm 777 -exec chmod 755 {} \+
+find . -perm 664 -exec chmod 644 {} \+
+
+cmake -B build -S $FFBLD/vid.stab \
+    -DCMAKE_C_FLAGS:STRING="-I$PKGD/usr/include $SCFLAGS" \
+    -DCMAKE_CXX_FLAGS:STRING="-I$PKGD/usr/include $SCXXFLAGS" \
+    -DCMAKE_C_FLAGS_RELEASE:STRING="-I$PKGD/usr/include $SCFLAGS" \
+    -DCMAKE_CXX_FLAGS_RELEASE:STRING="-I$PKGD/usr/include $SCXXFLAGS" \
+    -DCMAKE_EXE_LINKER_FLAGS="-L$PKGD/usr/lib -L$PKGD/usr/lib64 $SLDFLAGS"  \
+    -DCMAKE_INSTALL_PREFIX=/usr \
+    -DCMAKE_INSTALL_LIBDIR=lib${LIBDIRSUFFIX} \
+    -DUSE_OMP=OFF \
+    -DBUILD_SHARED_LIBS=OFF \
+    -DCMAKE_BUILD_TYPE=Release
+
+cmake --build build --parallel $nprocr 2>&1 | tee -a $OUTPUT/make-vidstab.log
+DESTDIR=$PKGD cmake --install build 2>&1 | tee -a $OUTPUT/install-vidstab.log
+
+mkdir -pv $PKGD/doc/vidstab-$vidstabver
+cp -av LICENSE README.md $PKGD/doc/vidstab-$vidstabver
+
+rm -vf $PKGD/usr/lib${LIBDIRSUFFIX}/*.la
+find $PKGD/usr/lib${LIBDIRSUFFIX} -name "*.so*" -exec rm -vf {} \+
+
+cd $FFBLD
+
+# Building libraw1394
+# Libraw1394,libavc1394 and libdc1394 requires that *.la files be present hence building last.
+
+tar xvf $FFSRC/libraw1394-$rawver.tar.gz
+cd libraw1394-$rawver
+chown -R root:root .
+find . -perm 777 -exec chmod 755 {} \+
+find . -perm 664 -exec chmod 644 {} \+
+
+patch -p0 --verbose < $CWD/patches/libraw1394_typedef.patch
+CPPFLAGS="-I$PKGD/usr/include" \
+CFLAGS="$SCFLAGS" \
+CXXFLAGS="$SCXXFLAGS" \
+LDFLAGS="-L$PKGD/usr/lib -L$PKGD/usr/lib64 $SLDFLAGS" \
+PKG_CONFIG_PATH="$PKGD/usr/lib64/pkgconfig" \
+./configure \
+  --prefix=/usr \
+  --libdir=/usr/lib${LIBDIRSUFFIX} \
+  --sysconfdir=/etc \
+  --enable-static=yes \
+  --enable-shared=no  2>&1 | tee $OUTPUT/configure-raw1394.log
+
+make -j$nprocr 2>&1 | tee $OUTPUT/make-raw1394.log
+make install DESTDIR=$PKGD 2>&1 | tee $OUTPUT/install-raw1394.log
+
+mkdir -pv $PKGD/doc/libraw1394
+cp -av AUTHORS COPYING.LIB $PKGD/doc/libraw1394
+
+cd $FFBLD
+
+# Building libavc1394
+
+tar xvf $FFSRC/libavc1394-$avcver.tar.gz
+cd libavc1394-$avcver
+chown -R root:root .
+find . -perm 777 -exec chmod 755 {} \+
+find . -perm 664 -exec chmod 644 {} \+
+
+CPPFLAGS="-I$PKGD/usr/include" \
+CFLAGS="-I$PKGD/usr/include $SCFLAGS" \
+CXXFLAGS="-I$PKGD/usr/include $SCXXFLAGS" \
+PKG_CONFIG_PATH="$PKGD/usr/lib64/pkgconfig" \
+LDFLAGS="-L$PKGD/usr/lib -L$PKGD/usr/lib64 $SLDFLAGS" \
+LIBRAW1394_CFLAGS="-I$PKGD/usr/include/libraw1394" \
+LIBRAW1394_LIBS="-L$PKGD/usr/lib64 -lraw1394" \
+./configure \
+  --prefix=/usr \
+  --libdir=/usr/lib${LIBDIRSUFFIX} \
+  --mandir=/usr/man \
+  --enable-static=yes \
+  --enable-shared=no  2>&1 | tee $OUTPUT/configure-avc1394.log
+
+make -j$nprocr 2>&1 | tee $OUTPUT/make-avc1394.log
+make install DESTDIR=$PKGD 2>&1 | tee $OUTPUT/install-avc1394.log
+
+mkdir -pv $PKGD/doc/libavc1394-$avcver
+cp -av AUTHORS COPYING $PKGD/doc/libavc1394-$avcver
+
+cd $FFBLD
+
+# Building libdc1394
+
+tar xvf $FFSRC/libdc1394-$dcver.tar.gz
+cd libdc1394-$dcver
+chown -R root:root .
+find . -perm 777 -exec chmod 755 {} \+
+find . -perm 664 -exec chmod 644 {} \+
+CPPFLAGS="-I$PKGD/usr/include $SCFLAGS" \
+CFLAGS="-I$PKGD/usr/include $SCFLAGS" \
+PKG_CONFIG_PATH="$PKGD/usr/lib64/pkgconfig" \
+LDFLAGS="-L$PKGD/usr/lib -L$PKGD/usr/lib64 -lraw1394 $SLDFLAGS" \
+./configure \
+  --prefix=/usr \
+  --libdir=/usr/lib${LIBDIRSUFFIX} \
+  --mandir=/usr/man \
+  --enable-static=yes \
+  --enable-shared=no \
+  --disable-examples 2>&1 | tee $OUTPUT/configure-dc394.log
+
+make -j$nprocr 2>&1 | tee $OUTPUT/make-dc1394.log
+make install DESTDIR=$PKGD 2>&1 | tee $OUTPUT/install-dc1394.log
+
+# Fix the pkgconfig file to get rid of unresolved symbols at runtime:
+sed -i -e "/^Libs:/s/$/ -lavc1394 -lraw1394/" $PKGD/usr/lib${LIBDIRSUFFIX}/pkgconfig/libdc1394-2.pc
+
+cd $FFBLD
+
+# Building FFmpeg
+
+cd $TMP
+VERSION=7.1
+rm -rf $SRCNAM-$VERSION
+tar xvf $FFSRC/ffmpeg-7.1.tar.xz
+cd $SRCNAM-$VERSION
+chown -R root:root .
+find . -perm 777 -exec chmod 755 {} \+
+find . -perm 664 -exec chmod 644 {} \+
+
+mkdir -pv $PKG/opt/{bin,lib${LIBDIRSUFFIX},share/$PRGNAM,lib${LIBDIRSUFFIX}/pkgconfig,include}
+mkdir -pv $PKG/usr/doc/$PRGNAM-$VERSION
+
+patch -Np1 --verbose --unified < $CWD/patches/ffmpeg-dts-chromium.patch
+
+export xmlin="$PKGD/usr/include/libxml2"
+export sv="$PKGD/usr/include/svt-av1"
+export dc="$PKGD/usr/include/dc1394"
+export ac="$PKGD/usr/include/libavc1394"
+export rw="$PKGD/usr/include/libraw1394"
+export ge="$PKGD/usr/include/gme"
+export bs="$PKGD/usr/include/bs2b"
+
+# -ludev -lusb-1.0 -ldc1394 -lavc1394 -lraw1394 --enable-libdc1394  \ --enable-libplacebo \ -DPL_HAVE_PTHREAD -DPTHREAD_HAS_SETCLOCK -DPL_STATIC
+dfc="-DCJSON_HIDE_SYMBOLS -DXML_STATIC -DLZMA_API_STATIC -DFRIBIDI_LIB_STATIC -UEB_DLL"
+fcd="-DOPJ_STATIC -D_REENTRANT -DLIBTWOLAME_STATIC"
+lflags="-lcodec2 -lrist -luavs3d -lvmaf -lstdc++ -lgcc -lgcc_s -lpthread -lusb-1.0 -ldc1394 -lavc1394 -lraw1394 -lbs2b -latomic -lc"
+CPPFLAGS="-I$PKGD/usr/include -I$vf -I$sv -I$xmlin -I$rw -I$ac -I$dc -I$bs -I/opt/include" \
+PKG_CONFIG_PATH="$PKGD/usr/lib64/pkgconfig:$PKGD/usr/lib/pkgconfig:/opt/lib64/pkgconfig" \
+./configure \
+  --extra-cflags="$dfc $fcd -I$PKGD/usr/include -I$vf -I$sv -I$xmlin -I$rw -I$ac -I$dc -I$bs -I/opt/include $SCFLAGS" \
+  --extra-cxxflags="$dfc $fcd -I$PKGD/usr/include -I$vf -I$sv -I$xmlin -I$rw -I$ac -I$dc -I$bs -I/opt/include $SCXXFLAGS" \
+  --extra-ldflags="-L$PKGD/usr/lib -L$PKGD/usr/lib64 -L/opt/lib64 $lflags -L/usr/lib64 $SLDFLAGS" \
+  --pkg-config-flags="--static" \
+  --prefix=/opt \
+  --bindir=/opt/bin \
+  --libdir=/opt/lib${LIBDIRSUFFIX} \
+  --shlibdir=/opt/lib${LIBDIRSUFFIX} \
+  --datadir=/opt/share/$PRGNAM \
+  --incdir=/opt/include \
+  --pkgconfigdir=/opt/lib${LIBDIRSUFFIX}/pkgconfig \
+  --mandir=/opt/man \
+  --docdir=/usr/doc/$PRGNAM-$VERSION/doc/html \
+  --logfile=/tmp/ffmpeg-build.log \
+  --arch=$ARCH \
+  --enable-gpl \
+  --enable-version3 \
+  --enable-nonfree \
+  --enable-static \
+  --enable-memory-poisoning \
+  --enable-error-resilience \
+  --enable-pic \
+  --enable-alsa \
+  --enable-bzlib \
+  --enable-gmp \
+  --enable-frei0r \
+  --enable-lcms2 \
+  --enable-libaom  \
+  --enable-libaribb24 \
+  --enable-libaribcaption \
+  --enable-libass \
+  --enable-libbluray \
+  --enable-libbs2b \
+  --enable-libcaca \
+  --enable-libcdio   \
+  --enable-libcodec2 \
+  --enable-libdc1394 \
+  --enable-libdvdnav  \
+  --enable-libdvdread  \
+  --enable-libdav1d  \
+  --enable-libdavs2 \
+  --enable-libfdk-aac \
+  --enable-libfreetype \
+  --enable-libfribidi  \
+  --enable-libfontconfig \
+  --enable-libgsm \
+  --enable-libgme \
+  --enable-libharfbuzz \
+  --enable-libiec61883 \
+  --enable-libilbc \
+  --enable-libklvanc \
+  --enable-libkvazaar \
+  --enable-liblc3 \
+  --enable-liblensfun \
+  --enable-libmodplug \
+  --enable-libmp3lame \
+  --enable-libopencore-amrnb \
+  --enable-libopencore-amrwb \
+  --enable-libopus \
+  --enable-libopenh264 \
+  --enable-libopenjpeg  \
+  --enable-libpulse \
+  --enable-librist \
+  --enable-librsvg \
+  --enable-libshine \
+  --enable-libsmbclient \
+  --enable-libsnappy \
+  --enable-libsoxr \
+  --enable-libspeex \
+  --enable-libsrt   \
+  --enable-libssh  \
+  --enable-libsvtav1 \
+  --enable-libtheora \
+  --enable-libtls  \
+  --enable-libtwolame \
+  --enable-libuavs3d \
+  --enable-libv4l2  \
+  --enable-libvidstab \
+  --enable-libvo-amrwbenc \
+  --enable-libvorbis  \
+  --enable-libvmaf \
+  --enable-libvpx \
+  --enable-libvvenc  \
+  --enable-libwebp \
+  --enable-libx264 \
+  --enable-libx265 \
+  --enable-libxeve \
+  --enable-libxevd \
+  --enable-libxavs2 \
+  --enable-libxcb \
+  --enable-libxcb-shm \
+  --enable-libxcb-xfixes  \
+  --enable-libxcb-shape \
+  --enable-libxvid \
+  --enable-libzimg  \
+  --enable-libzmq  \
+  --enable-libzvbi  \
+  --enable-lzma    \
+  --enable-openal \
+  --enable-opencl \
+  --enable-opengl \
+  --enable-sdl2 \
+  --enable-xlib \
+  --enable-zlib \
+  --enable-libdrm \
+  --enable-libvpl \
+  --enable-vaapi \
+  --enable-vdpau \
+  --enable-vulkan \
+  --disable-doc  \
+  --disable-htmlpages \
+  --disable-manpages \
+  --disable-podpages \
+  --disable-txtpages \
+  --disable-shared \
+  --disable-debug \
+  --disable-w32threads \
+  --disable-os2threads  \
+  --disable-appkit \
+  --disable-avfoundation \
+  --disable-coreimage \
+  --disable-metal \
+  --disable-sndio   \
+  --disable-schannel \
+  --disable-securetransport \
+  --disable-amf \
+  --disable-audiotoolbox \
+  --disable-cuda-llvm \
+  --disable-cuvid \
+  --disable-d3d11va \
+  --disable-d3d12va \
+  --disable-dxva2 \
+  --disable-ffnvcodec \
+  --disable-nvdec \
+  --disable-nvenc \
+  --disable-videotoolbox \
+  --disable-altivec \
+  --disable-vsx \
+  --disable-power8 \
+  --disable-armv5te \
+  --disable-armv6 \
+  --disable-armv6t2 \
+  --disable-vfp \
+  --disable-neon  \
+  --disable-dotprod  \
+  --disable-mipsdsp \
+  --disable-mipsdspr2  \
+  --disable-mipsfpu \
+  --disable-mmi \
+  --disable-lsx \
+  --disable-lasx  \
+  --disable-rvv \
+  --disable-valgrind-backtrace \
+  --disable-large-tests 2>&1 | tee $OUTPUT/configure-ffmpeg.log
+
+make -j$nprocr  2>&1 | tee $OUTPUT/make-ffmpeg.log
+cd tools
+CFLAGS="$SCFLAGS" gcc -static qt-faststart.c -o qt-faststart
+install -Dvm 0755 qt-faststart $PKG/opt/bin
+cd ..
+make install DESTDIR=$PKG 2>&1 | tee $OUTPUT/install-ffmpeg.log
+
+# Don't ship .la files:
+rm -f $PKG/opt/lib${LIBDIRSUFFIX}/*.la
+
+cp -dr --no-preserve='ownership' $PKGD/usr/bin/* $PKG/opt/bin
+
+if [ -d "$PKG" ]; then
+  find "$PKG" -print0 | xargs -0 file | grep -e "executable" | grep ELF \
+    | cut -f 1 -d : | xargs -r strip --strip-unneeded --remove-section=.comment --remove-section=.note 2> /dev/null || true
+fi
+
+if [ -d "$PKG/opt/usr/lib64" ]; then
+  find "$PKG/opt/usr/lib64" -name "*.a" | xargs -r strip --strip-unneeded --remove-section=.comment --remove-section=.note
+fi
+
+# copying precompiled vmaf model
+mkdir -pv $PKG/opt/share/pc_vmaf_model
+cp -dr --no-preserve='ownership' $FFBLD/vmaf-$vmafver/model/* $PKG/opt/share/pc_vmaf_model
+# copying vmaf model compiled during the build
+mkdir -pv $PKG/opt/share/vmaf_model
+cp -dr --no-preserve='ownership' $FFBLD/vmaf-$vmafver/libvmaf/build/src/vmaf_4k_v0.6.1.json $PKG/opt/share/vmaf_model
+cp -dr --no-preserve='ownership' $FFBLD/vmaf-$vmafver/libvmaf/build/src/vmaf_4k_v0.6.1neg.json $PKG/opt/share/vmaf_model
+cp -dr --no-preserve='ownership' $FFBLD/vmaf-$vmafver/libvmaf/build/src/vmaf_b_v0.6.3.json $PKG/opt/share/vmaf_model
+cp -dr --no-preserve='ownership' $FFBLD/vmaf-$vmafver/libvmaf/build/src/vmaf_float_4k_v0.6.1.json $PKG/opt/share/vmaf_model
+cp -dr --no-preserve='ownership' $FFBLD/vmaf-$vmafver/libvmaf/build/src/vmaf_float_b_v0.6.3.json $PKG/opt/share/vmaf_model
+cp -dr --no-preserve='ownership' $FFBLD/vmaf-$vmafver/libvmaf/build/src/vmaf_float_v0.6.1.json $PKG/opt/share/vmaf_model
+cp -dr --no-preserve='ownership' $FFBLD/vmaf-$vmafver/libvmaf/build/src/vmaf_float_v0.6.1neg.json $PKG/opt/share/vmaf_model
+cp -dr --no-preserve='ownership' $FFBLD/vmaf-$vmafver/libvmaf/build/src/vmaf_v0.6.1.json $PKG/opt/share/vmaf_model
+cp -dr --no-preserve='ownership' $FFBLD/vmaf-$vmafver/libvmaf/build/src/vmaf_v0.6.1neg.json  $PKG/opt/share/vmaf_model
+mkdir -pv $PKG/opt/share/lensfun
+cp -av $PKGD/usr/share/lensfun/version_2/* $PKG/opt/share/lensfun
+mkdir -pv $PKG/opt/share/java
+cp -dr --no-preserve='ownership' $PKGD/usr/share/java/* $PKG/opt/share/java
+mkdir -pv $PKG/opt/share/cmake-3.31
+cp -dr --no-preserve='ownership' $PKGD/usr/share/cmake-3.31/* $PKG/opt/share/cmake-3.31
+mkdir -pv $PKG/opt/share/WebP
+cp -dr --no-preserve='ownership' $PKGD/usr/share/WebP/* $PKG/opt/share/WebP
+
+# remove these pesky symlinks and make sure sbopkglint gives a clean chit.
+# these are available in the system itself.
+
+rm -rvf $PKG/opt/bin/bzcmp
+rm -rvf $PKG/opt/bin/bzegrep
+rm -rvf $PKG/opt/bin/bzfgrep
+rm -rvf $PKG/opt/bin/bzless
+rm -rvf $PKG/opt/bin/libpng-config
+rm -rvf $PKG/opt/bin/lzcat
+rm -rvf $PKG/opt/bin/lzcmp
+rm -rvf $PKG/opt/bin/lzdiff
+rm -rvf $PKG/opt/bin/lzegrep
+rm -rvf $PKG/opt/bin/lzfgrep
+rm -rvf $PKG/opt/bin/lzgrep
+rm -rvf $PKG/opt/bin/lzless
+rm -rvf $PKG/opt/bin/lzma
+rm -rvf $PKG/opt/bin/lzmore
+rm -rvf $PKG/opt/bin/unlzma
+rm -rvf $PKG/opt/bin/unxz
+rm -rvf $PKG/opt/bin/xzcat
+rm -rvf $PKG/opt/bin/xzcmp
+rm -rvf $PKG/opt/bin/xzegrep
+rm -rvf $PKG/opt/bin/xzfgrep
+
+# create symlink for ffmpeg binary
+
+mkdir -pv $PKG/usr/bin
+( cd "$PKG"
+ln -s /opt/bin/ffmpeg $PKG/usr/bin/ffmpeg7
+ln -s /opt/bin/ffplay $PKG/usr/bin/ffplay7
+ln -s /opt/bin/ffprobe $PKG/usr/bin/ffprobe7 )
+
+cd $TMP/$SRCNAM-$VERSION
+
+cp -a Changelog COPYING* CREDITS LICENSE* MAINTAINERS README* RELEASE $PKG/usr/doc/$PRGNAM-$VERSION
+cat $CWD/$PRGNAM.SlackBuild > $PKG/usr/doc/$PRGNAM-$VERSION/$PRGNAM.SlackBuild
+cp -a $PKGD/doc/* $PKG/usr/doc/$PRGNAM-$VERSION || true
+find $PKG/usr/doc -type f -print0 | parallel -0 chmod -v 0644
+chown -R root:root $PKG/usr/doc/$PRGNAM-$VERSION/*
+
+mkdir -p $PKG/install
+cat $CWD/slack-desc > $PKG/install/slack-desc
+
+cd $PKG
+/sbin/makepkg -l y -c n --remove-rpaths --remove-tmp-rpaths $OUTPUT/$PRGNAM-$VERSION-$ARCH-$BUILD$TAG.$PKGTYPE
+

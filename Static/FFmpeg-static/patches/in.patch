@@ -1,0 +1,15 @@
+--- CMakeLists.txt	2024-11-26 18:32:35.000000000 +0530
++++ CMakeLists1.txt	2025-01-24 12:17:27.114547000 +0530
+@@ -287,10 +287,9 @@
+       # Set pthreads as a whole-archive, otherwise weak symbols in the static
+       # libraries will discard pthreads symbols leading to segmentation fault at
+       # runtime.
+-      message(STATUS "Using -lpthread as --whole-archive")
++      message(STATUS "Using -lpthread")
+       set_target_properties(Threads::Threads PROPERTIES
+-        INTERFACE_LINK_LIBRARIES
+-            "-Wl,--whole-archive;-lpthread;-Wl,--no-whole-archive")
++        INTERFACE_LINK_LIBRARIES "-lpthread")
+     endif()
+   endif()
+ endif()  # JPEGXL_STATIC
