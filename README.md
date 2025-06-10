@@ -11,3 +11,15 @@ FFmpeg-git uses the git version of ffmpeg.
 The static folder contains a very experimental build 
 script for Static FFmpeg based on the build script by
 AlienBob.
+
+FFMPEG7 folder contains latest stable version and its git 
+version whichgets installed to /opt/ffmpeg. It also contains 
+script for most of the ffmpeg dependencies and minimizes packages
+maintainence.
+
+MPV folder contains mpv media player and its frontend
+mpc-qt.It also contains a script for installing dependencies
+also it will install ani-cli and yt-dlp binary to watch or
+download anime with mpv player. Mpv version is currently held at 
+version 0.38.0 and mpc-qt version held at 23.02 last known 
+version that works good in Slackware.
