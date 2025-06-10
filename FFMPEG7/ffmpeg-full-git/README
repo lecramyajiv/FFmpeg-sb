@@ -1,0 +1,37 @@
+FFmpeg is a complete solution to record, convert and stream audio
+and video. It includes libavcodec, the leading audio/video codec
+library. This builds from git directly.
+
+This builds the git snapshot of ffmpeg
+The last opencv ffmpeg supports is version 3.4.x and is an
+optional dependency.python3-numpy and OpenBLAS is only needed
+if you want to install opencv or lv2 plugins.
+
+add these to bashrc
+export PATH=/opt/ffmpeg/bin:$PATH
+export LD_LIBRARY_PATH="/opt/ffmpeg/lib64:/usr/lib64:/usr/lib64/zulu-openjdk17/lib/server"
+
+The following are disabled in ffmpeg-full:
+1. All documentation. Use system ffmpeg docs.
+2. libcelt. Superseded by Opus.
+3. Opencv disabled by default and if needed install opencv3
+4. libqrencode and libquirc needed for QR codes not needed for general purpose.
+5. libopenvino. Needed for machine learning not needed for general purpose.
+6. libtorch. Needed for machine learning not needed for general purpose.
+7. libtensorflow. Needed for machine learning not needed for general purpose.
+8. librabbitmq. Needed for streaming with AQMP protocol not needed for general purpose.
+9. librav1e. use libaom
+10. libjack. use alsa and pulse by default.
+11. libxavs. No longer maintaned upstream. 
+12. libxavs2. Very rare format. only decoder is needed.
+13. lv2. Use ladspa.
+14. pocketsphinx. Support Broken in FFmpeg.
+15. Nvidia and AMF is disabled since this gears towards Intel.
+16. Other CPU architecture optimizations are disabled. Supports only x86-64
+
+Some options are mutually exclusive:
+1. Enable either libgcrypt or libgmp 
+2. Enable either one of these libressl,GnuTls,OpenSSL and mbedtls 
+3. Enable either libglslang or libshaderc. 
+4. Enable either libmfx or libvpl
+

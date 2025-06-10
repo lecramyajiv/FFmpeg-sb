@@ -1,0 +1,13 @@
+Collection of ffmpeg dependencies.
+This contains the base dependencies.
+
+This package contains the following:
+1. libdrm
+2. opus
+3. libwebp
+4. libxml2
+5. openjpeg
+6. Vulkan-sdk
+7. Soundtouch
+8. DevIL
+9. Json
