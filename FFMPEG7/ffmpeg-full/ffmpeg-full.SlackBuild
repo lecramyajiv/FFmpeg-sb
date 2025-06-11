@@ -70,7 +70,7 @@ trap 'echo "$0 FAILED at line $LINENO!" | tee -a $OUTPUT/error-${PRGNAM}.log' ER
 export CC=${CC:-gcc}
 export CXX=${CXX:-g++}
 export CFLAGS="$SLKCFLAGS"
-export CXXFLAGS="$SLKCFLAGS"
+export CXXFLAGS="$SLKCXXFLAGS"
 export LDFLAGS="$SLDFLAGS"
 
 rm -rf $PKG
