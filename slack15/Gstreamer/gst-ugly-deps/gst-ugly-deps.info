@@ -1,0 +1,12 @@
+PRGNAM="gst-ugly-deps"
+VERSION="1.0"
+HOMEPAGE="https://gstreamer.freedesktop.org/"
+DOWNLOAD=""
+MD5SUM=""
+DOWNLOAD_x86_64="https://code.videolan.org/videolan/libmpeg2/-/archive/master/libmpeg2-master.tar.gz
+                 http://download.videolan.org/pub/libdvdcss/1.4.3/libdvdcss-1.4.3.tar.bz2 \
+                 http://deb.debian.org/debian/pool/main/libs/libsidplay/libsidplay_1.36.60.orig.tar.bz2"
+MD5SUM_x86_64=""
+REQUIRES="python3-meson-opt"
+MAINTAINER="Vijay Marcel"
+EMAIL="vijaymarcel@outlook.com"

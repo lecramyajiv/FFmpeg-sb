@@ -1,0 +1,37 @@
+Collection of ffmpeg dependencies.
+
+Uninstall ffmepg4 is stock slackware
+installation as libplacebo picks it up
+
+This is the series II of ffmepg dependencies.
+This slackbuild contains the following:
+
+1. openmpt
+2. libjxl
+3. codec2
+4. snappy
+5. libmodplug
+6. libass
+7. CLI11
+8. range-v3
+9. ghc_filesystem
+10. vapoursynth
+11. libmicrohttpd
+12. cryptopp
+13. librist
+14. libklvanc
+15. libaom
+16. shine
+17. xevd
+18. xeve
+19. uavs3d
+20. lensfun
+21. cpuinfo
+22. openh264
+23. flite
+24. leptonica
+25. libplacebo
+26. aom
+27. vamp-plugin-sdk
+28. numactl
+29. fmt
