@@ -1,0 +1,355 @@
+#!/bin/bash
+
+# Slackware build script for mpv-dep-I
+
+# Copyright 2025 Vijay Marcel
+# All rights reserved.
+#
+# Redistribution and use of this script, with or without modification, is
+# permitted provided that the following conditions are met:
+#
+# 1. Redistributions of this script must retain the above copyright
+#    notice, this list of conditions and the following disclaimer.
+#
+#  THIS SOFTWARE IS PROVIDED BY THE AUTHOR "AS IS" AND ANY EXPRESS OR IMPLIED
+#  WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+#  MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO
+#  EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+#  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+#  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
+#  OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+#  WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
+#  OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
+#  ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+cd $(dirname $0) ; CWD=$(pwd)
+
+PRGNAM=mpv-dep-I
+VERSION=${VERSION:-2.0}
+BUILD=${BUILD:-4}
+TAG=${TAG:-_SBo}
+PKGTYPE=${PKGTYPE:-tgz}
+nprocr=$(expr $(nproc))
+sys_arch=${sys_arch:-$(uname -m)}
+
+# Dependency name:
+# libuchardet
+charnam=${charnam:-uchardet}
+charver=${charver:-0.0.8}
+# libsixel
+sixnam=${sixnam:-libsixel}
+sixver=${sixver:-1.10.5}
+#ytnam
+ytnam=${ytnam:-yt-dlp_linux}
+#fzfnam
+fzfnam=${fzfnam:-fzf}
+fzfver=${fzfver:-0.62.0}
+# ani-cli
+aninam=${aninam:-ani-cli}
+aniver=${aniver:-4.10}
+# Aria2
+arianam=${arianam:-aria2}
+ariaver=${ariaver:-1.37.0}
+#luajit
+luajnam=${luajnam:-LuaJIT}
+luajver=${luajver:-2.1.ROLLING}
+#mujs
+mujnam=${mujnam:-mujs}
+mujver=${mujver:-1.3.6}
+
+case "$sys_arch" in
+   	x86_64) export ARCH=x86_64 ;;
+	     *) echo "This SlackBuild will not run on $sys_arch platform" && exit 1 ;;
+esac
+
+if [ ! -z "${PRINT_PACKAGE_NAME}" ]; then
+  echo "$PRGNAM-$VERSION-$ARCH-$BUILD$TAG.$PKGTYPE"
+  exit 0
+fi
+
+TMP=${TMP:-/tmp/SBo}
+PKG=$TMP/package-$PRGNAM
+OUTPUT=${OUTPUT:-/tmp}
+
+# --Wno-incompatible-pointer-types is valid only for C/objC and not for C++
+if [ "$ARCH" = "x86_64" ]; then
+  LIBDIRSUFFIX="64"
+  PFLAGS="-fno-delete-null-pointer-checks -Wno-incompatible-pointer-types"
+  PXXFLAGS="-fno-delete-null-pointer-checks"
+  ARCHFLAGS="-march=x86-64 -mtune=native -pipe -ffunction-sections -fdata-sections -O2 -fPIC"
+  GCFLAGS="-Wl,--sort-common=ascending -Wl,--sort-section=alignment -Wl,--gc-sections -Wl,-z,unique-symbol"
+  SLKCFLAGS="$ARCHFLAGS $PFLAGS"
+  SLKCXXFLAGS="$ARCHFLAGS $PXXFLAGS"
+  SLDFLAGS="$GCFLAGS"
+else  echo "this slackbuild will work only on $ARCH" && exit 1
+fi
+
+set -e
+trap 'echo "$0 FAILED at line $LINENO!" | tee -a $OUTPUT/error-${PRGNAM}.log' ERR
+
+export CC=${CC:-gcc}
+export CXX=${CXX:-g++}
+export CFLAGS="$SLKCFLAGS"
+export CXXFLAGS="$SLKCXXFLAGS"
+export LDFLAGS="$SLDFLAGS"
+
+export m=/opt/meson/bin # meson path
+export r=/opt/rust/bin # rust path
+export rl=/opt/rust/lib64
+
+PYVER=$(python3 -c 'import sys; print("%d.%d" % sys.version_info[:2])')
+export PYTHONPATH=/opt/python$PYVER/site-packages
+export PATH=$m:$r:$PATH
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$rl
+
+rm -rf $PKG
+mkdir -p $TMP $PKG $OUTPUT
+mkdir -pv $PKG/usr/doc/$PRGNAM-$VERSION
+
+cd $TMP
+
+# Building mujs
+
+rm -rf $mujnam-$mujver
+tar xvf $CWD/$mujnam-$mujver.tar.gz
+cd $mujnam-$mujver
+chown -R root:root .
+find -L . \
+ \( -perm 777 -o -perm 775 -o -perm 750 -o -perm 711 -o -perm 555 \
+  -o -perm 511 \) -exec chmod 755 {} \+ -o \
+ \( -perm 666 -o -perm 664 -o -perm 640 -o -perm 600 -o -perm 444 \
+  -o -perm 440 -o -perm 400 \) -exec chmod 644 {} \+
+
+chmod -v 644 docs/*.png
+
+make -j$nprocr -C $TMP/$mujnam-$mujver prefix=/usr libdir=/usr/lib${LIBDIRSUFFIX} release
+make -C $TMP/$mujnam-$mujver DESTDIR=$PKG prefix=/usr libdir=/usr/lib${LIBDIRSUFFIX} install-shared
+
+mkdir -p $PKG/usr/doc/$PRGNAM-$VERSION/$mujnam-$mujver
+cp -a AUTHORS COPYING README docs $PKG/usr/doc/$PRGNAM-$VERSION/$mujnam-$mujver
+
+cd $TMP
+
+# Building luajit
+
+rm -rf $luajnam-$luajver
+tar xvf $CWD/$luajnam-$luajver.tar.gz
+cd $luajnam-$luajver
+chown -R root:root .
+find -L . \
+ \( -perm 777 -o -perm 775 -o -perm 750 -o -perm 711 -o -perm 555 \
+  -o -perm 511 \) -exec chmod 755 {} \+ -o \
+ \( -perm 666 -o -perm 664 -o -perm 640 -o -perm 600 -o -perm 444 \
+  -o -perm 440 -o -perm 400 \) -exec chmod 644 {} \+
+
+# 20241105 bkw: next 2 stanzas come from Pat V's luajit.SlackBuild from -current.
+# Enable Lua 5.2 features:
+sed -i -e '/-DLUAJIT_ENABLE_LUA52COMPAT/s/^#//' src/Makefile
+
+# preserve timestamps:
+sed -i -e '/install -m/s/-m/-p -m/' Makefile
+
+LIB=lib$LIBDIRSUFFIX
+USRLIB=/usr/$LIB
+MAN1=/usr/man/man1
+PKGDOC=$PKG/usr/doc/$PRGNAM-$VERSION/$luajnam-$luajver
+
+runmake() {
+  CFLAGS="$SLKCFLAGS" \
+  CXXFLAGS="$SLKCXXFLAGS" \
+  LDFLAGS="$SLDFLAGS" \
+  make $1 \
+    Q=  \
+    DESTDIR=$2 \
+    PREFIX=/usr \
+    MULTILIB=$LIB \
+    INSTALL_LIB=$2/$USRLIB \
+    INSTALL_MAN=$2/$MAN1
+}
+
+runmake
+runmake install $PKG
+
+rm -rvf $PKG/usr/lib${LIBDIRSUFFIX}/*.la
+
+mkdir -pv $PKGDOC
+cp -av COPYRIGHT README $PKGDOC
+
+cd $TMP
+
+# Building aria2
+
+rm -rf $arianam-$ariaver
+tar xvf $CWD/$arianam-$ariaver.tar.xz
+cd $arianam-$ariaver
+chown -R root:root .
+find -L . \
+ \( -perm 777 -o -perm 775 -o -perm 750 -o -perm 711 -o -perm 555 \
+  -o -perm 511 \) -exec chmod 755 {} \+ -o \
+ \( -perm 666 -o -perm 664 -o -perm 640 -o -perm 600 -o -perm 444 \
+  -o -perm 440 -o -perm 400 \) -exec chmod 644 {} \+
+
+CFLAGS="$SLKCFLAGS" \
+CXXFLAGS="$SLKCXXFLAGS" \
+LDFLAGS="$SLDFLAGS" \
+./configure \
+  --prefix=/usr \
+  --sysconfdir=/etc \
+  --localstatedir=/var \
+  --mandir=/usr/man \
+  --docdir=/usr/doc/$PRGNAM-$VERSION \
+  --libdir=/usr/lib${LIBDIRSUFFIX} \
+  --enable-shared \
+  --enable-ssl \
+  --enable-bittorrent \
+  --enable-metalink \
+  --enable-websocket \
+  --enable-epoll \
+  --enable-libaria2 \
+  --with-libuv  \
+  --with-gnu-ld \
+  --without-wintls  \
+  --without-appletls \
+  --without-gnutls \
+  --disable-werror \
+  --disable-static
+
+make -j$nprocr
+make install DESTDIR=$PKG
+
+rm -rvf $PKG/usr/lib${LIBDIRSUFFIX}/*.la
+
+mkdir -pv $PKG/usr/doc/$PRGNAM-$VERSION/$arianam
+cp -av AUTHORS COPYING ChangeLog INSTALL LICENSE.OpenSSL README* $PKG/usr/doc/$PRGNAM-$VERSION/$arianam
+
+cd $TMP
+
+# installing yt-dlp
+
+rm -rf $ytnam
+cp -av $CWD/$ytnam $TMP/yt-dlp
+install -Dvm755 -oroot -groot $TMP/yt-dlp $PKG/usr/bin
+
+mkdir -pv $PKG/usr/doc/$PRGNAM-$VERSION/$ytnam
+cp -av $CWD/docs/[A-Z]* $PKG/usr/doc/$PRGNAM-$VERSION/$ytnam
+chown -v root:root $PKG/usr/doc/$PRGNAM-$VERSION/$ytnam/*
+
+cd $TMP
+
+# installing libfzf
+
+rm -rf $fzfnam
+tar xvf $CWD/$fzfnam-$fzfver-linux_amd64.tar.gz
+install -Dvm755 -oroot -groot $fzfnam $PKG/usr/bin
+
+mkdir -pv $PKG/usr/doc/$PRGNAM-$VERSION/$fzfnam
+cp -av $CWD/fzf-license $PKG/usr/doc/$PRGNAM-$VERSION/$fzfnam
+chown -v root:root $PKG/usr/doc/$PRGNAM-$VERSION/$fzfnam/*
+
+cd $TMP
+
+# installing ani-cli
+
+rm -rf $aninam-$aniver
+tar xvf $CWD/$aninam-$aniver.tar.gz
+cd $aninam-$aniver
+chown -R root:root .
+find -L . \
+ \( -perm 777 -o -perm 775 -o -perm 750 -o -perm 711 -o -perm 555 \
+  -o -perm 511 \) -exec chmod 755 {} \+ -o \
+ \( -perm 666 -o -perm 664 -o -perm 640 -o -perm 600 -o -perm 444 \
+  -o -perm 440 -o -perm 400 \) -exec chmod 644 {} \+
+
+install -Dvm 0755 $TMP/$aninam-$aniver/$aninam -t $PKG/usr/bin
+install -Dvm 0644 $TMP/$aninam-$aniver/$aninam.1 -t $PKG/usr/man/man1
+
+mkdir -pv $PKG/usr/doc/$PRGNAM-$VERSION/$aninam
+cp -av disclaimer.md LICENSE README.md $PKG/usr/doc/$PRGNAM-$VERSION/$aninam
+
+cd $TMP
+
+# building libuchardet
+
+rm -rf $charnam-$charver
+tar xvf $CWD/$charnam-$charver.tar.xz
+cd $charnam-$charver
+chown -R root:root .
+find -L . \
+ \( -perm 777 -o -perm 775 -o -perm 750 -o -perm 711 -o -perm 555 \
+  -o -perm 511 \) -exec chmod 755 {} \+ -o \
+ \( -perm 666 -o -perm 664 -o -perm 640 -o -perm 600 -o -perm 444 \
+  -o -perm 440 -o -perm 400 \) -exec chmod 644 {} \+
+
+cmake -B build -S $TMP/$charnam-$charver \
+    -DCMAKE_C_FLAGS:STRING="$SLKCFLAGS" \
+    -DCMAKE_CXX_FLAGS:STRING="$SLKCXXFLAGS" \
+    -DCMAKE_C_FLAGS_RELEASE:STRING="$SLKCFLAGS" \
+    -DCMAKE_CXX_FLAGS_RELEASE:STRING="$SLKCXXFLAGS" \
+    -DCMAKE_EXE_LINKER_FLAGS:STRING="$SLDFLAGS" \
+    -DCMAKE_INSTALL_PREFIX=/usr \
+    -DCMAKE_INSTALL_LIBDIR=/usr/lib${LIBDIRSUFFIX} \
+    -DCMAKE_INSTALL_BINDIR=/usr/bin \
+    -DCMAKE_INSTALL_FULL_INCLUDEDIR=/usr/include \
+    -DCMAKE_INSTALL_MANDIR=/usr/man \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DBUILD_SHARED_LIBS=ON
+
+cmake --build build --parallel $nprocr
+DESTDIR=$PKG cmake --install build
+
+rm -rvf $PKG/usr/lib${LIBDIRSUFFIX}/*.la
+
+mkdir -pv $PKG/usr/doc/$PRGNAM-$VERSION/$charnam
+cp -av AUTHORS COPYING README.md $PKG/usr/doc/$PRGNAM-$VERSION/$charnam
+
+cd $TMP
+
+# building libsixel
+
+rm -rf $sixnam-$sixver
+tar xvf $CWD/$sixnam-$sixver.tar.gz
+cd $sixnam-$sixver
+chown -R root:root .
+find -L . \
+ \( -perm 777 -o -perm 775 -o -perm 750 -o -perm 711 -o -perm 555 \
+  -o -perm 511 \) -exec chmod 755 {} \+ -o \
+ \( -perm 666 -o -perm 664 -o -perm 640 -o -perm 600 -o -perm 444 \
+  -o -perm 440 -o -perm 400 \) -exec chmod 644 {} \+
+
+CFLAGS="$SLKCFLAGS" \
+CXXFLAGS="$SLKCXXFLAGS" \
+LDFLAGS="$SLDFLAGS" \
+meson setup build $TMP/$sixnam-$sixver \
+    --prefix=/usr \
+    --libdir=/usr/lib${LIBDIRSUFFIX} \
+    --localstatedir=/var \
+    --mandir=/usr/man \
+    --sysconfdir=/etc \
+    --buildtype=release \
+    -Dstrip=true
+
+ninja -j$nprocr -v -C build
+DESTDIR=$PKG ninja -v -C build install
+
+rm -f $PKG/usr/lib${LIBDIRSUFFIX}/*.la
+
+mkdir -pv $PKG/usr/doc/$PRGNAM-$VERSION/$sixnam
+cp -av AUTHORS LICENSE NEWS README.md $PKG/usr/doc/$PRGNAM-$VERSION/$sixnam
+
+cd $TMP
+
+find $PKG -print0 | xargs -0 file | grep -e "executable" -e "shared object" | grep ELF \
+  | cut -f 1 -d : | xargs strip --strip-unneeded --remove-section=.comment --remove-section=.note 2> /dev/null || true
+
+find $PKG/usr/man -type f -exec gzip -9 {} \;
+for i in $( find $PKG/usr/man -type l ) ; do ln -s $( readlink $i ).gz $i.gz ; rm $i ; done
+
+cat $CWD/$PRGNAM.SlackBuild > $PKG/usr/doc/$PRGNAM-$VERSION/$PRGNAM.SlackBuild
+
+mkdir -p $PKG/install
+cat $CWD/slack-desc > $PKG/install/slack-desc
+#find $PKG/opt/ffmpeg/lib${LIBDIRSUFFIX} -type f -exec chmod 0755 {} \+
+find $PKG/usr/doc/$PRGNAM-$VERSION -type f -exec chmod 0644 {} \+
+
+cd $PKG
+/sbin/makepkg -l y -c n --remove-rpaths --remove-tmp-rpaths $OUTPUT/$PRGNAM-$VERSION-$ARCH-$BUILD$TAG.$PKGTYPE
