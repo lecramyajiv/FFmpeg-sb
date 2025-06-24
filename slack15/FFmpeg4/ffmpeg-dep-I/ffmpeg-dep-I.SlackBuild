@@ -1320,27 +1320,27 @@ export CARGO_HOME=".cargo"
 # Building the library
 cd dolby_vision
 
-cargo fetch --manifest-path $TMP/${SRCNAM}-$SRCVER/dolby_vision/Cargo.toml
+cargo fetch --manifest-path $TMP/${dovnam}-${dovver}/dolby_vision/Cargo.toml
 
 cargo cbuild --release --color always --verbose \
             --prefix=/usr \
             --libdir=/usr/lib${LIBDIRSUFFIX} \
             --pkgconfigdir=/usr/lib${LIBDIRSUFFIX}/pkgconfig \
             --destdir=$PKG \
-            --manifest-path $TMP/${SRCNAM}-$SRCVER/dolby_vision/Cargo.toml
+            --manifest-path $TMP/${dovnam}-${dovver}/dolby_vision/Cargo.toml
 
 cargo cinstall --release --frozen --color always --verbose \
             --prefix=/usr \
             --libdir=/usr/lib${LIBDIRSUFFIX} \
             --pkgconfigdir=/usr/lib${LIBDIRSUFFIX}/pkgconfig \
-            --destdir=$PKG \
+            --destdir=$PKG  
 
 cd ..
 
 # Building the binary
 
-cargo fetch --locked --manifest-path $TMP/${SRCNAM}-$SRCVER/Cargo.toml
-cargo build --release --frozen --manifest-path $TMP/${SRCNAM}-$SRCVER/Cargo.toml
+cargo fetch --locked --manifest-path $TMP/${dovnam}-${dovver}/Cargo.toml
+cargo build --release --frozen --manifest-path $TMP/${dovnam}-${dovver}/Cargo.toml
 
 mkdir -pv $PKG/usr/bin
 install -Dvm0755 "target/release/dovi_tool" -t $PKG/usr/bin
