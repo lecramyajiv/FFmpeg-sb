@@ -629,50 +629,52 @@ cp -av AUTHORS COPYING.LIB README.LICENSE $PKG/usr/doc/$PRGNAM-$VERSION/$mmsnam-
 cd $TMP
 
 # Building musepack
+# musepack tools are disabled here since in this script
+# it fails compilation but the musepack_tools from SBo works
 
-rm -rf $musenam\_$musever
-tar xzvf $CWD/$musenam\_$musever.tar.gz
-cd $musenam\_$musever
-chown -R root:root .
-find -L . \
- \( -perm 777 -o -perm 775 -o -perm 750 -o -perm 711 -o -perm 555 \
-  -o -perm 511 \) -exec chmod 755 {} \+ -o \
- \( -perm 666 -o -perm 664 -o -perm 640 -o -perm 600 -o -perm 444 \
-  -o -perm 440 -o -perm 400 \) -exec chmod 644 {} \+
+#rm -rf $musenam\_$musever
+#tar xzvf $CWD/$musenam\_$musever.tar.gz
+#cd $musenam\_$musever
+#chown -R root:root .
+#find -L . \
+# \( -perm 777 -o -perm 775 -o -perm 750 -o -perm 711 -o -perm 555 \
+#  -o -perm 511 \) -exec chmod 755 {} \+ -o \
+# \( -perm 666 -o -perm 664 -o -perm 640 -o -perm 600 -o -perm 444 \
+#  -o -perm 440 -o -perm 400 \) -exec chmod 644 {} \+
 
 # from SBo:
 # sane defaults (hints from Gentoo)
-patch -p1 < $CWD/patches/musepack-tools-475.patch
+#patch -p1 < $CWD/patches/musepack-tools-475.patch
 # fix building with -fno-common
-patch -p1 < $CWD/patches/musepack-tools-465-fno-common.patch
+#patch -p1 < $CWD/patches/musepack-tools-465-fno-common.patch
 
-cmake -B build -S $TMP/$musenam\_$musever \
-    -DCMAKE_C_FLAGS:STRING="$SLKCFLAGS" \
-    -DCMAKE_CXX_FLAGS:STRING="$SLKCXXFLAGS" \
-    -DCMAKE_C_FLAGS_RELEASE:STRING="$SLKCFLAGS" \
-    -DCMAKE_CXX_FLAGS_RELEASE:STRING="$SLKCXXFLAGS" \
-    -DCMAKE_EXE_LINKER_FLAGS:STRING="$SLDFLAGS" \
-    -DCMAKE_INSTALL_PREFIX:PATH=/usr \
-    -DCMAKE_INSTALL_LIBDIR:PATH=/usr/lib${LIBDIRSUFFIX} \
-    -DLIB_SUFFIX=$LIBDIRSUFFIX \
-    -DCMAKE_INSTALL_BINDIR:PATH=/usr/bin \
-    -DCMAKE_INSTALL_MANDIR:PATH=/usr/man \
-    -DCMAKE_BUILD_TYPE:STRING=Release \
-    -DBUILD_SHARED_LIBS=ON
+#cmake -B build -S $TMP/$musenam\_$musever \
+#    -DCMAKE_C_FLAGS:STRING="$SLKCFLAGS" \
+#    -DCMAKE_CXX_FLAGS:STRING="$SLKCXXFLAGS" \
+#    -DCMAKE_C_FLAGS_RELEASE:STRING="$SLKCFLAGS" \
+#    -DCMAKE_CXX_FLAGS_RELEASE:STRING="$SLKCXXFLAGS" \
+#    -DCMAKE_EXE_LINKER_FLAGS:STRING="$SLDFLAGS" \
+#    -DCMAKE_INSTALL_PREFIX:PATH=/usr \
+#    -DCMAKE_INSTALL_LIBDIR:PATH=/usr/lib${LIBDIRSUFFIX} \
+#    -DLIB_SUFFIX=$LIBDIRSUFFIX \
+#    -DCMAKE_INSTALL_BINDIR:PATH=/usr/bin \
+#    -DCMAKE_INSTALL_MANDIR:PATH=/usr/man \
+#    -DCMAKE_BUILD_TYPE:STRING=Release \
+#    -DBUILD_SHARED_LIBS=ON
 
-cmake --build build --parallel $nprocr
-DESTDIR=$PKG cmake --install build
+#make -j1 -C build
+#make -C build install DESTDIR=$PKG
 
 # Remove the svn-related files
-rm -Rf $PKG/usr/include/mpc/.svn
-rm -f $PKG/usr/lib${LIBDIRSUFFIX}/*.la
+#rm -Rf $PKG/usr/include/mpc/.svn
+#rm -f $PKG/usr/lib${LIBDIRSUFFIX}/*.la
 
-mkdir -pv $PKG/usr/doc/$PRGNAM-$VERSION/$musenam\_$musever
-cd libmpcdec
-cp -av AUTHORS COPYING $PKG/usr/doc/$PRGNAM-$VERSION/$musenam\_$musever
-cd ..
+#mkdir -pv $PKG/usr/doc/$PRGNAM-$VERSION/$musenam\_$musever
+#cd libmpcdec
+#cp -av AUTHORS COPYING $PKG/usr/doc/$PRGNAM-$VERSION/$musenam\_$musever
+#cd ..
 
-cd $TMP
+#cd $TMP
 
 # libsrtp
 
