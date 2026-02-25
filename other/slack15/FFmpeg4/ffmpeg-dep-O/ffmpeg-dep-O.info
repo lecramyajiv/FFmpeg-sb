@@ -1,0 +1,13 @@
+PRGNAM="ffmpeg-dep-O"
+VERSION="1.0"
+HOMEPAGE="https://ffmepg.org"
+DOWNLOAD=""
+MD5SUM=""
+DOWNLOAD_x86_64="https://codeberg.org/soundtouch/soundtouch/archive/2.4.0.tar.gz https://downloads.sourceforge.net/project/openil/DevIL/1.8.0/DevIL-1.8.0.tar.gz https://github.com/lu-zero/cargo-c/archive/v0.10.13/cargo-c-0.10.13.tar.gz https://github.com/lu-zero/cargo-c/releases/download/v0.10.13/Cargo.lock"
+MD5SUM_x86_64="eec20bde8f47f27f95b931ad041d5d79 \
+               4d8c21aa4822ac86d77e44f8d7c9becd \
+               cb5609d8f6254d132d0226319935138d \
+               63955b5f548d15c2418872620eeb990d"
+REQUIRES="rust-opt python3-build python3-wheel python3-packaging-opt python3-setuptools-opt python3-glad python3-meson-opt"
+MAINTAINER="Vijay Marcel"
+EMAIL="vijaymarcel@outlook.com"

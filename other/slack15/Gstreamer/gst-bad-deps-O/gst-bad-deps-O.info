@@ -1,0 +1,14 @@
+PRGNAM="gst-bad-deps-O"
+VERSION="1.0"
+HOMEPAGE="https://gstreamer.freedesktop.org"
+DOWNLOAD=""
+MD5SUM=""
+DOWNLOAD_x86_64="http://files.musepack.net/source/libcuefile_r475.tar.gz http://files.musepack.net/source/libreplaygain_r475.tar.gz https://github.com/abseil/abseil-cpp/archive/20250512.0/abseil-cpp-20250512.0.tar.gz https://downloads.xiph.org/releases/libshout/libshout-2.4.6.tar.gz https://downloads.sourceforge.net/sourceforge/goom/goom2k4/0/goom-2k4-0-src.tar.gz"
+MD5SUM_x86_64="1a6ac52e1080fd54f0f59372345f1e4e \
+               e27b3b1249b7fbae92d656d9e3d26633 \
+               ecd64c3c38b20335c48e1ede28a8db90 \
+               4a66a369a01ce790e578221fa2c8ea60 \
+               8100dd07e0c6784fdf079eeaa53a5c7f"
+REQUIRES=""
+MAINTAINER="Vijay Marcel"
+EMAIL="vijaymarcel@outlook.com"

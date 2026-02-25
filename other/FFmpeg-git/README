@@ -1,0 +1,8 @@
+FFmpeg is the leading multimedia framework, able to decode, encode,
+transcode, mux, demux, stream, filter and play pretty much anything
+that humans and machines have created. It supports the most obscure
+ancient formats up to the cutting edge. It includes libavcodec, the
+leading audio/video codec library.
+
+This is optimized for intel processor with intel on board
+graphics card. Disabled not needed features.

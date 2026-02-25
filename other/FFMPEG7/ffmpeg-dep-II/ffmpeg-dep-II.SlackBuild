@@ -1,0 +1,1320 @@
+#!/bin/bash
+
+# Slackware build script for ffmpeg-dep-II
+
+# Copyright 2025 Vijay Marcel
+# All rights reserved.
+#
+# Redistribution and use of this script, with or without modification, is
+# permitted provided that the following conditions are met:
+#
+# 1. Redistributions of this script must retain the above copyright
+#    notice, this list of conditions and the following disclaimer.
+#
+#  THIS SOFTWARE IS PROVIDED BY THE AUTHOR "AS IS" AND ANY EXPRESS OR IMPLIED
+#  WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+#  MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO
+#  EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+#  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+#  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
+#  OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+#  WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
+#  OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
+#  ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+cd $(dirname $0) ; CWD=$(pwd)
+
+PRGNAM=ffmpeg-dep-II
+VERSION=${VERSION:-1.0}
+BUILD=${BUILD:-4}
+TAG=${TAG:-_SBo}
+PKGTYPE=${PKGTYPE:-tgz}
+nprocr=$(expr $(nproc))
+sys_arch=${sys_arch:-$(uname -m)}
+
+# Dependency name
+
+# codec2
+codnam=${codnam:-codec2}
+codver=${codver:-1.2.0}
+# libjxl
+jxlnam=${jxlnam:-libjxl}
+jxlver=${jxlver:-0.11.1}
+jpgnam=${jpgnam:-libjpeg-turbo}
+jpgver=${jpgver:-3.0.2}
+# Sbappy
+snanam=${snanam:-snappy}
+snaver=${snaver:-1.2.2}
+# modplug
+modpnam=${modpnam:-libmodplug}
+modpver=${modpver:-0.8.9.0}
+#libass
+assnam=${assnam:-libass}
+assver=${assver:-0.17.3}
+#libklvanc
+vancnam=${vancnam:-libklvanc}
+vancom=${vancom:-b409fc2}
+vancver=${vancver:-b409fc2b0b8051c871f89367a3489f8aa2b6ed37}
+# rist
+ristnam=${ristnam:-librist}
+ristver=${ristver:-0.2.11}
+# cryptopp
+crypnam=${crypnam:-cryptopp}
+crypver=${crypver:-CRYPTOPP_8_9_0}
+# openmpt
+mptnam=${mptnam:-libopenmpt}
+mptver=${mptver:-0.7.13}
+# libaom
+aomnam=${aomnam:-libaom}
+aomver=${aomver:-3.12.1}
+# libshine
+shinenam=${shinenam:-shine}
+shinever=${shinever:-ab5e352}
+shinecom=${shinecom:-ab5e3526b64af1a2eaa43aa6f441a7312e013519}
+#Vapoursynth
+vsnam=${vsnam:-vapoursynth}
+vsver=${vsver:-R71}
+# Xevd
+xevdnam=${xevdnam:-xevd}
+xevdver=${xevdver:-7966f43}
+xevdcom=${xevdcom:-7966f43a3566a506e9705c504ba27e844be32591}
+# Xeve
+xevenam=${xevenam:-xeve}
+xevever=${xevever:-7d69e50}
+xevecom=${xevecom:-7d69e5095855fd09f43257e1060c6335c383809c}
+# uavs3d
+uavsnam=${uavsnam:-uavs3d}
+uavscom=${uavscom:-1fd04917cff50fac72ae23e45f82ca6fd9130bd8}
+uavsver=${uavsver:-1fd0491}
+# lensfun
+lensnam=${lensnam:-lensfun}
+lenscom=${lenscom:-fcbfbf38e5c297fc5595705c2e61ff5b3eaeb9d9}
+lensver=${lensver:-fcbfbf3}
+#cpuinfo
+cpunam=${cpunam:-cpuinfo}
+cpucom=${cpucom:-de0ce7c7251372892e53ce9bc891750d2c9a4fd8}
+cpuver=${cpuver:-de0ce7c}
+#openh264
+ophnam=${ophnam:-openh264}
+ophver=${ophver:-2.6.0}
+#flite
+flnam=${flnam:-flite}
+flver=${flver:-2.2}
+#leptonica
+leptnam=${leptnam:-leptonica}
+leptver=${leptver:-1.85.0}
+# libplacebo
+placenam=${placenam:-libplacebo}
+placever=${placever:-7.351.0}
+# vamp-plugin-sdk
+vampnam=${vampnam:-vamp-plugin-sdk}
+vampver=${vampver:-2.10.0}
+# Numactl
+numanam=${numanam:-numactl}
+numaver=${numaver:-2.0.19}
+#fmt
+fmtnam=${fmtnam:-fmt}
+fmtver=${fmtver:-11.2.0}
+# Range-v3
+rangenam=${rangenam:-range-v3}
+rangever=${rangever:-0.12.0}
+#CLI11
+clinam=${clinam:-CLI11}
+cliver=${cliver:-2.5.0}
+# ghc_filesystem
+ghfnam=${ghfnam:-filesystem}
+ghfver=${ghfver:-1.5.14}
+
+
+case "$sys_arch" in
+   	x86_64) export ARCH=x86_64 ;;
+	     *) echo "This SlackBuild will not run on $sys_arch platform" && exit 1 ;;
+esac
+
+if [ ! -z "${PRINT_PACKAGE_NAME}" ]; then
+  echo "$PRGNAM-$VERSION-$ARCH-$BUILD$TAG.$PKGTYPE"
+  exit 0
+fi
+
+TMP=${TMP:-/tmp/SBo}
+PKG=$TMP/package-$PRGNAM
+OUTPUT=${OUTPUT:-/tmp}
+
+# --Wno-incompatible-pointer-types is valid only for C/objC and not for C++
+if [ "$ARCH" = "x86_64" ]; then
+  LIBDIRSUFFIX="64"
+  INCFLAGS="-I/opt/ffmpeg/include"
+  PFLAGS="-fno-delete-null-pointer-checks -Wno-incompatible-pointer-types"
+  PXXFLAGS="-fno-delete-null-pointer-checks"
+  ARCHFLAGS="-march=x86-64 -mtune=native -pipe -ffunction-sections -fdata-sections -O2 -fPIC"
+  GCFLAGS="-Wl,--sort-common=ascending -Wl,--sort-section=alignment -Wl,--gc-sections -Wl,-z,unique-symbol"
+  DF="-L/opt/ffmpeg/lib${LIBDIRSUFFIX}"
+  SLKCFLAGS="$INCFLAGS $ARCHFLAGS $PFLAGS"
+  SLKCXXFLAGS="$INCFLAGS $ARCHFLAGS $PXXFLAGS"
+  SLDFLAGS="$GCFLAGS $DF"
+else
+  echo "this slackbuild will work only on $ARCH" && exit 1
+fi
+
+set -e
+trap 'echo "$0 FAILED at line $LINENO!" | tee -a $OUTPUT/error-${PRGNAM}.log' ERR
+
+export CC=${CC:-gcc}
+export CXX=${CXX:-g++}
+export CFLAGS="$SLKCFLAGS"
+export CXXFLAGS="$SLKCXXFLAGS"
+export LDFLAGS="$SLDFLAGS"
+
+export pk=${pk:-/opt/ffmpeg/lib${LIBDIRSUFFIX}/pkgconfig}  # dep pkgconfig files
+export l=${l:-/opt/ffmpeg/lib${LIBDIRSUFFIX}}  # dep libraries
+export inc=${inc:-/opt/ffmpeg/include}  # dep headers
+export bin=${bin:-/opt/ffmpeg/bin} # dep binaries
+export cl=/opt/ffmpeg/lib64/cmake  # deps .cmake path
+export sh=/opt/ffmpeg/share
+export shc=/opt/ffmpeg/share/cmake
+export shp=/opt/ffmpeg/share/pkgconfig
+export m=/opt/meson/bin # meson path
+
+PYVER=$(python3 -c 'import sys; print("%d.%d" % sys.version_info[:2])')
+export PYTHONPATH=/opt/python$PYVER/site-packages
+export PKG_CONFIG_PATH=$pk:$cl:$shc:$shp:$sh:$PKG_CONFIG_PATH
+export LD_LIBRARY_PATH=$l:$LD_LIBRARY_PATH
+export PATH=$l:$pk:$inc:$bin:$cl:$m:$shc:$shp:$sh:$PATH
+
+rm -rf $PKG
+mkdir -p $TMP $PKG $OUTPUT
+mkdir -pv $PKG/opt/ffmpeg/{bin,lib${LIBDIRSUFFIX},share,lib${LIBDIRSUFFIX}/pkgconfig,include,doc}
+mkdir -pv $PKG/usr/doc/$PRGNAM-$VERSION
+
+cd $TMP
+
+# Building CLI11
+
+rm -rf $clinam-$cliver
+tar xvf $CWD/$clinam-$cliver.tar.gz
+cd $clinam-$cliver
+chown -R root:root .
+find -L . \
+ \( -perm 777 -o -perm 775 -o -perm 750 -o -perm 711 -o -perm 555 \
+  -o -perm 511 \) -exec chmod 755 {} \+ -o \
+ \( -perm 666 -o -perm 664 -o -perm 640 -o -perm 600 -o -perm 444 \
+  -o -perm 440 -o -perm 400 \) -exec chmod 644 {} \+
+
+cmake -B build -S $TMP/$clinam-$cliver \
+    -DCMAKE_C_FLAGS:STRING="$SLKCFLAGS" \
+    -DCMAKE_CXX_FLAGS:STRING="$SLKCXXFLAGS" \
+    -DCMAKE_C_FLAGS_RELEASE:STRING="$SLKCFLAGS" \
+    -DCMAKE_CXX_FLAGS_RELEASE:STRING="$SLKCXXFLAGS" \
+    -DCMAKE_EXE_LINKER_FLAGS:STRING="$SLDFLAGS" \
+    -DCMAKE_INSTALL_PREFIX:PATH=/opt/ffmpeg \
+    -DCMAKE_INSTALL_LIBDIR:PATH=/opt/ffmpeg/lib${LIBDIRSUFFIX} \
+    -DCMAKE_INSTALL_BINDIR:PATH=/opt/ffmpeg/bin \
+    -DCMAKE_INSTALL_MANDIR:PATH=/opt/ffmpeg/man \
+    -DBUILD_SHARED_LIBS:BOOL=ON \
+    -DCMAKE_BUILD_TYPE:STRING=Release \
+    -DCLI11_BUILD_DOCS=OFF \
+    -DCLI11_BUILD_TESTS=OFF \
+    -DCLI11_BUILD_EXAMPLES=OFF
+
+cmake --build build --parallel $nprocr
+DESTDIR=$PKG cmake --install build
+
+rm -f $PKG/opt/ffmpeg/lib${LIBDIRSUFFIX}/*.la
+
+mkdir -pv $PKG/usr/doc/$PRGNAM-$VERSION/$clinam
+cp -a LICENSE README.md $PKG/usr/doc/$PRGNAM-$VERSION/$clinam
+
+cd $TMP
+
+# Building ghc_filesystem
+
+rm -rf $ghfnam-$ghfver
+tar xvf $CWD/$ghfnam-$ghfver.tar.gz
+cd $ghfnam-$ghfver
+chown -R root:root .
+find -L . \
+ \( -perm 777 -o -perm 775 -o -perm 750 -o -perm 711 -o -perm 555 \
+  -o -perm 511 \) -exec chmod 755 {} \+ -o \
+ \( -perm 666 -o -perm 664 -o -perm 640 -o -perm 600 -o -perm 444 \
+  -o -perm 440 -o -perm 400 \) -exec chmod 644 {} \+
+
+cmake -B build -S $TMP/$ghfnam-$ghfver \
+    -DCMAKE_C_FLAGS:STRING="$SLKCFLAGS" \
+    -DCMAKE_CXX_FLAGS:STRING="$SLKCXXFLAGS" \
+    -DCMAKE_C_FLAGS_RELEASE:STRING="$SLKCFLAGS" \
+    -DCMAKE_CXX_FLAGS_RELEASE:STRING="$SLKCXXFLAGS" \
+    -DCMAKE_EXE_LINKER_FLAGS:STRING="$SLDFLAGS" \
+    -DCMAKE_INSTALL_PREFIX:PATH=/opt/ffmpeg \
+    -DCMAKE_INSTALL_LIBDIR:PATH=/opt/ffmpeg/lib${LIBDIRSUFFIX} \
+    -DCMAKE_INSTALL_BINDIR:PATH=/opt/ffmpeg/bin \
+    -DCMAKE_INSTALL_MANDIR:PATH=/opt/ffmpeg/man \
+    -DBUILD_SHARED_LIBS:BOOL=ON \
+    -DCMAKE_BUILD_TYPE:STRING=Release \
+    -DGHC_FILESYSTEM_BUILD_TESTING=OFF \
+    -DGHC_FILESYSTEM_BUILD_EXAMPLES=OFF \
+    -DGHC_FILESYSTEM_BUILD_STD_TESTING=OFF
+
+cmake --build build --parallel $nprocr
+DESTDIR=$PKG cmake --install build
+
+rm -f $PKG/opt/ffmpeg/lib${LIBDIRSUFFIX}/*.la
+
+mkdir -pv $PKG/usr/doc/$PRGNAM-$VERSION/$ghfnam
+cp -av LICENSE README.md $PKG/usr/doc/$PRGNAM-$VERSION/$ghfnam
+
+cd $TMP
+
+# Building range-v3
+
+rm -rf $rangenam-$rangever
+tar xvf $CWD/$rangenam-$rangever.tar.gz
+cd $rangenam-$rangever
+chown -R root:root .
+find -L . \
+ \( -perm 777 -o -perm 775 -o -perm 750 -o -perm 711 -o -perm 555 \
+  -o -perm 511 \) -exec chmod 755 {} \+ -o \
+ \( -perm 666 -o -perm 664 -o -perm 640 -o -perm 600 -o -perm 444 \
+  -o -perm 440 -o -perm 400 \) -exec chmod 644 {} \+
+
+cmake -B build -S $TMP/$rangenam-$rangever \
+    -DCMAKE_C_FLAGS:STRING="$SLKCFLAGS" \
+    -DCMAKE_CXX_FLAGS:STRING="$SLKCXXFLAGS" \
+    -DCMAKE_C_FLAGS_RELEASE:STRING="$SLKCFLAGS" \
+    -DCMAKE_CXX_FLAGS_RELEASE:STRING="$SLKCXXFLAGS" \
+    -DCMAKE_EXE_LINKER_FLAGS:STRING="$SLDFLAGS" \
+    -DCMAKE_INSTALL_PREFIX:PATH=/opt/ffmpeg \
+    -DCMAKE_INSTALL_LIBDIR:PATH=/opt/ffmpeg/lib${LIBDIRSUFFIX} \
+    -DCMAKE_INSTALL_BINDIR:PATH=/opt/ffmpeg/bin \
+    -DCMAKE_INSTALL_MANDIR:PATH=/opt/ffmpeg/man \
+    -DBUILD_SHARED_LIBS:BOOL=ON \
+    -DCMAKE_BUILD_TYPE:STRING=Release
+
+cmake --build build --parallel $nprocr
+DESTDIR=$PKG cmake --install build
+
+rm -f $PKG/opt/ffmpeg/lib${LIBDIRSUFFIX}/*.la
+
+mkdir -pv $PKG/usr/doc/$PRGNAM-$VERSION/$rangenam
+cp -av CREDITS.md LICENSE.txt README.md $PKG/usr/doc/$PRGNAM-$VERSION/$rangenam
+
+cd $TMP
+
+# Building fmt
+
+rm -rf $fmtnam-$fmtver
+tar xvf $CWD/$fmtnam-$fmtver.tar.gz
+cd $fmtnam-$fmtver
+chown -R root:root .
+find -L . \
+ \( -perm 777 -o -perm 775 -o -perm 750 -o -perm 711 -o -perm 555 \
+  -o -perm 511 \) -exec chmod 755 {} \+ -o \
+ \( -perm 666 -o -perm 664 -o -perm 640 -o -perm 600 -o -perm 444 \
+  -o -perm 440 -o -perm 400 \) -exec chmod 644 {} \+
+
+cmake -B build -S $TMP/$fmtnam-$fmtver \
+    -DCMAKE_C_FLAGS:STRING="$SLKCFLAGS" \
+    -DCMAKE_CXX_FLAGS:STRING="$SLKCXXFLAGS" \
+    -DCMAKE_C_FLAGS_RELEASE:STRING="$SLKCFLAGS" \
+    -DCMAKE_CXX_FLAGS_RELEASE:STRING="$SLKCXXFLAGS" \
+    -DCMAKE_EXE_LINKER_FLAGS:STRING="$SLDFLAGS" \
+    -DCMAKE_INSTALL_PREFIX:PATH=/opt/ffmpeg \
+    -DCMAKE_INSTALL_LIBDIR:PATH=/opt/ffmpeg/lib${LIBDIRSUFFIX} \
+    -DCMAKE_INSTALL_BINDIR:PATH=/opt/ffmpeg/bin \
+    -DCMAKE_INSTALL_MANDIR:PATH=/opt/ffmpeg/man \
+    -DBUILD_SHARED_LIBS:BOOL=ON \
+    -DCMAKE_BUILD_TYPE:STRING=Release \
+    -DFMT_INSTALL=ON \
+    -DFMT_OS=ON \
+    -DFMT_SYSTEM_HEADERS=ON \
+    -DFMT_UNICODE=ON \
+    -DFMT_DOC=OFF \
+    -DFMT_TEST=OFF \
+    -DFMT_FUZZ=OFF \
+    -DFMT_CUDA_TEST=OFF \
+    -DFMT_MODULE=OFF
+
+cmake --build build --parallel $nprocr
+DESTDIR=$PKG cmake --install build
+
+rm -f $PKG/opt/ffmpeg/lib${LIBDIRSUFFIX}/*.la
+
+mkdir -pv $PKG/usr/doc/$PRGNAM-$VERSION/$fmtnam
+cp -av *.md LICENSE $PKG/usr/doc/$PRGNAM-$VERSION/$fmtnam
+
+cd $TMP
+
+# Building vamp-plugin-sdk
+
+rm -rf $vampnam-$vampver
+tar xvf $CWD/$vampnam-$vampver.tar.gz
+cd $vampnam-$vampver
+chown -R root:root .
+find -L . \
+ \( -perm 777 -o -perm 775 -o -perm 750 -o -perm 711 -o -perm 555 \
+  -o -perm 511 \) -exec chmod 755 {} \+ -o \
+ \( -perm 666 -o -perm 664 -o -perm 640 -o -perm 600 -o -perm 444 \
+  -o -perm 440 -o -perm 400 \) -exec chmod 644 {} \+
+
+#From SBo:Fix libdir on x86_64
+sed -i "s|\<lib\>|&$LIBDIRSUFFIX|g" Makefile.in pkgconfig/*.pc.in
+
+CFLAGS="$SLKCFLAGS" \
+CXXFLAGS="$SLKCXXFLAGS" \
+LDFLAGS="$SLDFLAGS" \
+./configure \
+  --prefix=/opt/ffmpeg \
+  --bindir=/opt/ffmpeg/bin \
+  --libdir=/opt/ffmpeg/lib${LIBDIRSUFFIX} \
+  --sysconfdir=/opt/ffmpeg/etc \
+  --localstatedir=/opt/ffmpeg/var \
+  --mandir=/opt/ffmpeg/man \
+  --enable-shared \
+  -enable-programs \
+  --disable-static
+
+make -j$nprocr
+make install DESTDIR=$PKG
+
+rm -f $PKG/opt/ffmpeg/lib${LIBDIRSUFFIX}/*.la
+
+mkdir -pv $PKG/usr/doc/$PRGNAM-$VERSION/$vampnam
+cp -av CHANGELOG COPYING README* $PKG/usr/doc/$PRGNAM-$VERSION/$vampnam
+
+mkdir -p $PKG/etc/profile.d/
+cat << EOF > $PKG/etc/profile.d/vamp.csh
+#!/bin/csh
+setenv VAMP_PATH /opt/ffmpeg/lib${LIBDIRSUFFIX}/vamp
+EOF
+cat << EOF > $PKG/etc/profile.d/vamp.sh
+#!/bin/sh
+export VAMP_PATH=/opt/ffmpeg/lib${LIBDIRSUFFIX}/vamp
+EOF
+chmod 0755 $PKG/etc/profile.d/*
+
+cd $TMP
+
+# Building numactl
+
+rm -rf $numanam-$numaver
+tar xvf $CWD/$numanam-$numaver.tar.gz
+cd $numanam-$numaver
+chown -R root:root .
+find -L . \
+ \( -perm 777 -o -perm 775 -o -perm 750 -o -perm 711 -o -perm 555 \
+  -o -perm 511 \) -exec chmod 755 {} \; -o \
+ \( -perm 666 -o -perm 664 -o -perm 640 -o -perm 600 -o -perm 444 \
+  -o -perm 440 -o -perm 400 \) -exec chmod 644 {} \;
+
+CFLAGS="$SLKCFLAGS" \
+CXXFLAGS="$SLKCXXFLAGS" \
+LDFLAGS="$SLDFLAGS" \
+./configure \
+  --prefix=/opt/ffmpeg \
+  --libdir=/opt/ffmpeg/lib${LIBDIRSUFFIX} \
+  --sysconfdir=/opt/ffmpeg/etc \
+  --localstatedir=/opt/ffmpeg/var \
+  --mandir=/opt/ffmpeg/man \
+  --enable-shared \
+  --enable-static=no
+
+make -j$nprocr
+make install DESTDIR=$PKG
+
+rm -f $PKG/opt/ffmpeg/lib${LIBDIRSUFFIX}/*.la
+
+mkdir -pv $PKG/usr/doc/$PRGNAM-$VERSION/$numanam
+cp -ar INSTALL.md README.md LICENSE.GPL2 LICENSE.LGPL2.1 test $PKG/usr/doc/$PRGNAM-$VERSION/$numanam
+
+cd $TMP
+
+# Building libplacebo
+rm -rf $placenam-$placever
+tar xvf $CWD/$placenam-v$placever.tar.gz
+cd $placenam-$placever
+chown -R root:root .
+find -L . \
+ \( -perm 777 -o -perm 775 -o -perm 750 -o -perm 711 -o -perm 555 \
+  -o -perm 511 \) -exec chmod 755 {} \+ -o \
+ \( -perm 666 -o -perm 664 -o -perm 640 -o -perm 600 -o -perm 444 \
+  -o -perm 440 -o -perm 400 \) -exec chmod 644 {} \+
+
+CFLAGS="$SLKCFLAGS" \
+CXXFLAGS="$SLKCXXFLAGS" \
+LDFLAGS="$SLDFLAGS" \
+meson setup build $TMP/$placenam-$placever \
+    --prefix=/opt/ffmpeg \
+    --libdir=/opt/ffmpeg/lib${LIBDIRSUFFIX} \
+    --localstatedir=/opt/ffmpeg/var \
+    --mandir=/opt/ffmpeg/man \
+    --sysconfdir=/opt/ffmpeg/etc \
+    --buildtype=release \
+    -Dstrip=true \
+    -Dlcms=enabled \
+    -Dvulkan=enabled \
+    -Dshaderc=enabled \
+    -Dvk-proc-addr=enabled \
+    -Dopengl=enabled \
+    -Dgl-proc-addr=enabled \
+    -Dvulkan-registry=/opt/ffmpeg/share/vulkan/registry/vk.xml \
+    -Ddemos=false \
+    -Dd3d11=disabled \
+    -Dunwind=disabled \
+    -Dtests=false
+
+ninja -j$nprocr -v -C build
+DESTDIR=$PKG ninja -v -C build install
+
+rm -f $PKG/opt/ffmpeg/lib${LIBDIRSUFFIX}/*.la
+
+mkdir -pv $PKG/usr/doc/$PRGNAM-$VERSION/$placenam-$placever
+cp -av LICENSE README.md $PKG/usr/doc/$PRGNAM-$VERSION/$placenam-$placever
+
+cd $TMP
+
+# Building leptonica
+
+rm -rf $leptnam-$leptver
+tar xvf $CWD/$leptnam-$leptver.tar.gz
+cd $leptnam-$leptver
+chown -R root:root .
+find -L . \
+ \( -perm 777 -o -perm 775 -o -perm 750 -o -perm 711 -o -perm 555 \
+  -o -perm 511 \) -exec chmod 755 {} \+ -o \
+ \( -perm 666 -o -perm 664 -o -perm 640 -o -perm 600 -o -perm 444 \
+  -o -perm 440 -o -perm 400 \) -exec chmod 644 {} \+
+
+./autogen.sh
+CFLAGS="$SLKCFLAGS" \
+CXXFLAGS="$SLKCXXFLAGS" \
+LDFLAGS="$SLDFLAGS" \
+./configure \
+  --prefix=/opt/ffmpeg \
+  --bindir=/opt/ffmpeg/bin \
+  --libdir=/opt/ffmpeg/lib${LIBDIRSUFFIX} \
+  --sysconfdir=/opt/ffmpeg/etc \
+  --localstatedir=/opt/ffmpeg/var \
+  --mandir=/opt/ffmpeg/man \
+  --enable-shared \
+  --enable-programs \
+  --with-zlib \
+  --with-libpng \
+  --with-jpeg \
+  --with-giflib \
+  --with-libtiff \
+  --with-libwebp  \
+  --with-libwebpmux \
+  --with-libopenjpeg \
+  --with-gnu-ld \
+  --disable-static \
+  --disable-debug
+
+make -j$nprocr
+make install DESTDIR=$PKG
+
+rm -f $PKG/opt/ffmpeg/lib${LIBDIRSUFFIX}/*.la
+
+mkdir -pv $PKG/usr/doc/$PRGNAM-$VERSION/$leptnam-$leptver
+cp -a README.html README.md leptonica-license.txt $PKG/usr/doc/$PRGNAM-$VERSION/$leptnam-$leptver
+
+cd $TMP
+
+# Building flite
+
+rm -rf $flnam-$flver
+tar xvf $CWD/$flnam-$flver.tar.gz
+tar xvf $CWD/flite-voice-0-1.1.tar.gz
+tar xvf $CWD/flite-voice-01-1.1.tar.gz
+tar xvf $CWD/flite-voice-02-1.1.tar.gz
+tar xvf $CWD/flite-voice-in01-1.0.tar.gz
+tar xvf $CWD/flite-voice-in02-1.0.tar.gz
+tar xvf $CWD/flite-voice-in03-1.0.tar.gz
+cd $flnam-$flver
+mkdir -pv fvox
+mv -v $TMP/flite-voice-0-1.1/*.flitevox fvox
+mv -v $TMP/flite-voice-01-1.1/*.flitevox fvox
+mv -v $TMP/flite-voice-02-1.1/*.flitevox fvox
+mv -v $TMP/flite-voice-in01-1.0/*.flitevox fvox
+mv -v $TMP/flite-voice-in02-1.0/*.flitevox fvox
+mv -v $TMP/flite-voice-in03-1.0/*.flitevox fvox
+chown -R root:root .
+find -L . \
+ \( -perm 777 -o -perm 775 -o -perm 750 -o -perm 711 -o -perm 555 \
+  -o -perm 511 \) -exec chmod 755 {} \+ -o \
+ \( -perm 666 -o -perm 664 -o -perm 640 -o -perm 600 -o -perm 444 \
+  -o -perm 440 -o -perm 400 \) -exec chmod 644 {} \+
+
+CFLAGS="$SLKCFLAGS" \
+CXXFLAGS="$SLKCXXFLAGS" \
+LDFLAGS="$SLDFLAGS" \
+./configure \
+  --prefix=/opt/ffmpeg \
+  --libdir=/opt/ffmpeg/lib${LIBDIRSUFFIX} \
+  --sysconfdir=/opt/ffmpeg/etc \
+  --localstatedir=/opt/ffmpeg/var \
+  --mandir=/opt/ffmpeg/man \
+  --with-audio=alsa \
+  --with-lang \
+  --with-vox \
+  --with-lex \
+  --enable-shared
+
+make -j$nprocr
+make install DESTDIR=$PKG
+
+install -s -m0755 bin/t2p bin/flite_time $PKG/opt/ffmpeg/bin
+
+# include any *.flitevox files the user downloaded.
+for file in $TMP/$flnam-$flver/fvox/*.flitevox; do
+  [ -e "$file" ] && \
+    mkdir -p $PKG/opt/ffmpeg/share/$flnam && \
+    cat $file > $PKG/opt/ffmpeg/share/$flnam/"$( basename "$file" )" && \
+    EXTRA=yes
+done
+
+rm -f $PKG/opt/ffmpeg/lib${LIBDIRSUFFIX}/*.la
+
+mkdir -pv $PKG/usr/doc/$PRGNAM-$VERSION/$flnam-$flver
+cp -av ACKNOWLEDGEMENTS COPYING README* $PKG/usr/doc/$PRGNAM-$VERSION/$flnam-$flver
+
+cd $TMP
+
+# Building openh264
+
+rm -rf $ophnam-$ophver
+tar xvf $CWD/$ophnam-$ophver.tar.gz
+cd $ophnam-$ophver
+chown -R root:root .
+find -L . \
+ \( -perm 777 -o -perm 775 -o -perm 750 -o -perm 711 -o -perm 555 \
+  -o -perm 511 \) -exec chmod 755 {} \+ -o \
+ \( -perm 666 -o -perm 664 -o -perm 640 -o -perm 600 -o -perm 444 \
+  -o -perm 440 -o -perm 400 \) -exec chmod 644 {} \+
+
+CFLAGS="$SLKCFLAGS" CXXFLAGS="$SLKCXXFLAGS" \
+LDFLAGS="$SLDFLAGS" make -C $TMP/$ophnam-$ophver OS=linux PREFIX="/opt/ffmpeg" \
+    ARCH="$ARCH" LIBDIR_NAME="lib${LIBDIRSUFFIX}" SHAREDLIB_DIR="/opt/ffmpeg/lib${LIBDIRSUFFIX}"
+make DESTDIR="$PKG" PREFIX="/opt/ffmpeg" LIBDIR_NAME="lib${LIBDIRSUFFIX}" \
+    SHAREDLIB_DIR="/opt/ffmpeg/lib${LIBDIRSUFFIX}" install
+
+make OS=linux ARCH=$ARCH
+install -Dvm755 h264dec $PKG/opt/ffmpeg/bin/h264dec
+install -Dvm755 h264enc $PKG/opt/ffmpeg/bin/h264enc
+
+rm -f $PKG/opt/ffmpeg/lib${LIBDIRSUFFIX}/*.la
+
+mkdir -pv $PKG/usr/doc/$PRGNAM-$VERSION/$ophnam-$ophver
+cp -av LICENSE CONTRIBUTORS RELEASES *.md  $PKG/usr/doc/$PRGNAM-$VERSION/$ophnam-$ophver
+
+cd $TMP
+
+# Building cpuinfo
+
+rm -rf $cpunam-$cpucom
+tar xvf $CWD/$cpunam-$cpuver.tar.gz
+cd $cpunam-$cpucom
+chown -R root:root .
+find -L . \
+ \( -perm 777 -o -perm 775 -o -perm 750 -o -perm 711 -o -perm 555 \
+  -o -perm 511 \) -exec chmod 755 {} \+ -o \
+ \( -perm 666 -o -perm 664 -o -perm 640 -o -perm 600 -o -perm 444 \
+  -o -perm 440 -o -perm 400 \) -exec chmod 644 {} \+
+
+cmake -B build -S $TMP/$cpunam-$cpucom \
+    -DCMAKE_C_FLAGS:STRING="$SLKCFLAGS" \
+    -DCMAKE_CXX_FLAGS:STRING="$SLKCXXFLAGS" \
+    -DCMAKE_C_FLAGS_RELEASE:STRING="$SLKCFLAGS" \
+    -DCMAKE_CXX_FLAGS_RELEASE:STRING="$SLKCXXFLAGS" \
+    -DCMAKE_EXE_LINKER_FLAGS:STRING="$SLDFLAGS" \
+    -DCMAKE_INSTALL_PREFIX:PATH=/opt/ffmpeg \
+    -DCMAKE_INSTALL_LIBDIR:PATH=/opt/ffmpeg/lib${LIBDIRSUFFIX} \
+    -DCMAKE_INSTALL_BINDIR:PATH=/opt/ffmpeg/bin \
+    -DCMAKE_INSTALL_MANDIR:PATH=/opt/ffmpeg/man \
+    -DCPUINFO_LIBRARY_TYPE=shared \
+    -DCPUINFO_RUNTIME_TYPE=shared \
+    -DCPUINFO_LOG_LEVEL=none \
+    -DCPUINFO_LOG_TO_STDIO=OFF \
+    -DCPUINFO_BUILD_UNIT_TESTS=OFF \
+    -DCPUINFO_BUILD_MOCK_TESTS=OFF \
+    -DCPUINFO_BUILD_BENCHMARKS=OFF \
+    -DUSE_SYSTEM_LIBS=ON \
+    -DCMAKE_BUILD_TYPE=Release
+
+cmake --build build --parallel $nprocr
+DESTDIR=$PKG cmake --install build
+
+rm -f $PKG/opt/ffmpeg/lib${LIBDIRSUFFIX}/*.la
+
+mkdir -pv $PKG/usr/doc/$PRGNAM-$VERSION/$cpunam
+cp -av LICENSE README.md CONTRIBUTING.md $PKG/usr/doc/$PRGNAM-$VERSION/$cpunam
+
+cd $TMP
+
+# Building liblensfun
+
+rm -rf $lensnam-$lenscom
+tar xvf $CWD/$lensnam-$lensver.tar.gz
+cd $lensnam-$lenscom
+chown -R root:root .
+find -L . \
+ \( -perm 777 -o -perm 775 -o -perm 750 -o -perm 711 -o -perm 555 \
+  -o -perm 511 \) -exec chmod 755 {} \+ -o \
+ \( -perm 666 -o -perm 664 -o -perm 640 -o -perm 600 -o -perm 444 \
+  -o -perm 440 -o -perm 400 \) -exec chmod 644 {} \+
+
+cmake -B build -S $TMP/$lensnam-$lenscom -G Ninja \
+    -DCMAKE_C_FLAGS:STRING="$SLKCFLAGS" \
+    -DCMAKE_CXX_FLAGS:STRING="$SLKCXXFLAGS" \
+    -DCMAKE_C_FLAGS_RELEASE:STRING="$SLKCFLAGS" \
+    -DCMAKE_CXX_FLAGS_RELEASE:STRING="$SLKCXXFLAGS" \
+    -DCMAKE_EXE_LINKER_FLAGS:STRING="$SLDFLAGS" \
+    -DCMAKE_INSTALL_PREFIX:PATH=/opt/ffmpeg \
+    -DCMAKE_INSTALL_LIBDIR:PATH=/opt/ffmpeg/lib${LIBDIRSUFFIX} \
+    -DCMAKE_INSTALL_BINDIR:PATH=/opt/ffmpeg/bin \
+    -DCMAKE_INSTALL_MANDIR:PATH=/opt/ffmpeg/man \
+    -DCMAKE_CXX_EXTENSIONS:BOOL=ON \
+    -DBUILD_LENSTOOL:BOOL=ON \
+    -DBUILD_SHARED_LIBS=ON \
+    -DINSTALL_PYTHON_MODULE=OFF \
+    -DCMAKE_BUILD_TYPE=Release
+
+cmake --build build --parallel $nprocr
+DESTDIR=$PKG cmake --install build
+
+rm -f $PKG/opt/ffmpeg/lib${LIBDIRSUFFIX}/*.la
+
+mkdir -pv $PKG/usr/doc/$PRGNAM-$VERSION/$lensnam
+cp -a COPYING COPYING.LESSER README.md $PKG/usr/doc/$PRGNAM-$VERSION/$lensnam
+
+cd $TMP
+
+# Building uavs3d
+
+rm -rf $uavsnam-$uavscom
+tar xvf $CWD/$uavsnam-$uavsver.tar.gz
+cd $uavsnam-$uavscom
+chown -R root:root .
+find -L . \
+ \( -perm 777 -o -perm 775 -o -perm 750 -o -perm 711 -o -perm 555 \
+  -o -perm 511 \) -exec chmod 755 {} \+ -o \
+ \( -perm 666 -o -perm 664 -o -perm 640 -o -perm 600 -o -perm 444 \
+  -o -perm 440 -o -perm 400 \) -exec chmod 644 {} \+
+
+cd source
+patch  --verbose --unified  < $CWD/patches/fix-libdir.patch
+cd ..
+
+mkdir -pv build/linux
+
+cmake -B build/linux -S $TMP/$uavsnam-$uavscom \
+    -DCMAKE_C_FLAGS:STRING="$SLKCFLAGS" \
+    -DCMAKE_CXX_FLAGS:STRING="$SLKCXXFLAGS" \
+    -DCMAKE_C_FLAGS_RELEASE:STRING="$SLKCFLAGS" \
+    -DCMAKE_CXX_FLAGS_RELEASE:STRING="$SLKCXXFLAGS" \
+    -DCMAKE_EXE_LINKER_FLAGS:STRING="$SLDFLAGS" \
+    -DCMAKE_INSTALL_PREFIX:PATH=/opt/ffmpeg \
+    -DCMAKE_INSTALL_LIBDIR:PATH=/opt/ffmpeg/lib${LIBDIRSUFFIX} \
+    -DCMAKE_INSTALL_BINDIR:PATH=/opt/ffmpeg/bin \
+    -DCMAKE_INSTALL_MANDIR:PATH=/opt/ffmpeg/man \
+    -DBUILD_SHARED_LIBS=ON \
+    -DCMAKE_BUILD_TYPE:STRING=Release \
+    -DCOMPILE_10BIT=1
+
+cmake --build  build/linux --parallel $nprocr
+DESTDIR=$PKG cmake --install build/linux
+
+install -Dvm 0755 $TMP/$uavsnam-$uavscom/build/linux/uavs3dec -t "$PKG/opt/ffmpeg/bin"
+
+rm -f $PKG/opt/ffmpeg/lib${LIBDIRSUFFIX}/*.la
+
+mkdir -pv $PKG/usr/doc/$PRGNAM-$VERSION/$uavsnam
+cp -a COPYING README.md $PKG/usr/doc/$PRGNAM-$VERSION/$uavsnam
+
+cd $TMP
+
+# Building xeve
+
+rm -rf $xevenam-$xevecom
+tar xvf $CWD/$xevenam-$xevever.tar.gz
+cd $xevenam-$xevecom
+chown -R root:root .
+find -L . \
+ \( -perm 777 -o -perm 775 -o -perm 750 -o -perm 711 -o -perm 555 \
+  -o -perm 511 \) -exec chmod 755 {} \+ -o \
+ \( -perm 666 -o -perm 664 -o -perm 640 -o -perm 600 -o -perm 444 \
+  -o -perm 440 -o -perm 400 \) -exec chmod 644 {} \+
+
+xevesver=${xevesver:-0.5.1}
+printf '%s\n' "v${xevesver}" > "$TMP/$xevenam-$xevecom/version.txt"
+patch -Np1 --verbose --unified < $CWD/patches/020-xeve-fix-pkg-config.patch
+
+cmake -B build -S $TMP/$xevenam-$xevecom \
+    -DCMAKE_C_FLAGS:STRING="$SLKCFLAGS" \
+    -DCMAKE_CXX_FLAGS:STRING="$SLKCXXFLAGS" \
+    -DCMAKE_C_FLAGS_RELEASE:STRING="$SLKCFLAGS" \
+    -DCMAKE_CXX_FLAGS_RELEASE:STRING="$SLKCXXFLAGS" \
+    -DCMAKE_EXE_LINKER_FLAGS:STRING="$SLDFLAGS" \
+    -DCMAKE_INSTALL_PREFIX:PATH=/opt/ffmpeg \
+    -DCMAKE_INSTALL_LIBDIR:PATH=/opt/ffmpeg/lib${LIBDIRSUFFIX} \
+    -DCMAKE_INSTALL_BINDIR:PATH=/opt/ffmpeg/bin \
+    -DCMAKE_INSTALL_MANDIR:PATH=/opt/ffmpeg/man \
+    -DBUILD_SHARED_LIBS=ON \
+    -DCMAKE_BUILD_TYPE:STRING=Release
+
+cmake --build build --parallel $nprocr
+DESTDIR=$PKG cmake --install build
+
+rm -f $PKG/opt/ffmpeg/lib${LIBDIRSUFFIX}/*.la
+
+mkdir -pv $PKG/usr/doc/$PRGNAM-$VERSION/$xevenam
+cp -av COPYING README.md $PKG/usr/doc/$PRGNAM-$VERSION/$xevenam
+
+cd $TMP
+
+# Building xevd
+
+rm -rf $xevdnam-$xevdcom
+tar xvf $CWD/$xevdnam-$xevdver.tar.gz
+cd $xevdnam-$xevdcom
+chown -R root:root .
+find -L . \
+ \( -perm 777 -o -perm 775 -o -perm 750 -o -perm 711 -o -perm 555 \
+  -o -perm 511 \) -exec chmod 755 {} \+ -o \
+ \( -perm 666 -o -perm 664 -o -perm 640 -o -perm 600 -o -perm 444 \
+  -o -perm 440 -o -perm 400 \) -exec chmod 644 {} \+
+
+xevdsver=${xevdsver:-0.5.1}
+printf '%s\n' "v${xevdsver}" > "$TMP/$xevdnam-$xevdcom/version.txt"
+patch -Np1 --verbose --unified < $CWD/patches/020-xevd-fix-pkg-config.patch
+
+cmake -B build -S $TMP/$xevdnam-$xevdcom \
+    -DCMAKE_C_FLAGS:STRING="$SLKCFLAGS" \
+    -DCMAKE_CXX_FLAGS:STRING="$SLKCXXFLAGS]" \
+    -DCMAKE_C_FLAGS_RELEASE:STRING="$SLKCFLAGS" \
+    -DCMAKE_CXX_FLAGS_RELEASE:STRING="$SLKCXXFLAGS" \
+    -DCMAKE_EXE_LINKER_FLAGS:STRING="$SLDFLAGS" \
+    -DCMAKE_INSTALL_PREFIX:PATH=/opt/ffmpeg \
+    -DCMAKE_INSTALL_LIBDIR:PATH=/opt/ffmpeg/lib${LIBDIRSUFFIX} \
+    -DCMAKE_INSTALL_BINDIR:PATH=/opt/ffmpeg/bin \
+    -DCMAKE_INSTALL_MANDIR:PATH=/opt/ffmpeg/man \
+    -DBUILD_SHARED_LIBS=ON \
+    -DCMAKE_BUILD_TYPE:STRING=Release
+
+cmake --build build --parallel $nprocr
+DESTDIR=$PKG cmake --install build
+
+rm -f $PKG/opt/ffmpeg/lib${LIBDIRSUFFIX}/*.la
+
+mkdir -pv $PKG/usr/doc/$PRGNAM-$VERSION/$xevdnam
+cp -av COPYING README.md $PKG/usr/doc/$PRGNAM-$VERSION/$xevdnam
+
+cd $TMP
+
+# Building vapoursynth
+
+rm -rf $vsnam-$vsver
+tar xvf $CWD/$vsnam-$vsver.tar.gz
+cd $vsnam-$vsver
+chown -R root:root .
+find -L . \
+ \( -perm 777 -o -perm 775 -o -perm 750 -o -perm 711 -o -perm 555 \
+  -o -perm 511 \) -exec chmod 755 {} \+ -o \
+ \( -perm 666 -o -perm 664 -o -perm 640 -o -perm 600 -o -perm 444 \
+  -o -perm 440 -o -perm 400 \) -exec chmod 644 {} \+
+
+autoreconf -fi
+sed -z -i "s|PACKAGE_URL='http://www.vapoursynth.com/\n'|PACKAGE_URL='http://www.vapoursynth.com/'|" configure
+
+CFLAGS="$SLKCFLAGS" \
+CXXFLAGS="$SLKCXXFLAGS" \
+LDFLAGS="$SLDFLAGS" \
+./configure \
+  --prefix=/opt/ffmpeg \
+  --libdir=/opt/ffmpeg/lib${LIBDIRSUFFIX} \
+  --sysconfdir=/opt/ffmpeg/etc \
+  --localstatedir=/opt/ffmpeg/var \
+  --mandir=/opt/ffmpeg/man \
+  --docdir=/opt/ffmpeg/doc/$vsnam-$vsver \
+  --enable-shared \
+  --disable-static
+
+make -j$nprocr
+make install DESTDIR=$PKG
+
+rm -f $PKG/opt/ffmpeg/lib${LIBDIRSUFFIX}/*.la
+
+install -D -m0644 $CWD/$vsnam.xml $PKG/usr/share/mime/packages/$vsnam.xml
+
+mkdir -pv $PKG/usr/doc/$PRGNAM-$VERSION/$vsnam-$vsver
+cp -a COPYING.LESSER ChangeLog README.md $PKG/usr/doc/$PRGNAM-$VERSION/$vsnam-$vsver
+
+cd $TMP
+
+# Building libshine
+rm -rf $shinenam-$shinever
+tar xvf $CWD/$shinenam-$shinever.tar.gz
+cd $shinenam-$shinecom
+chown -R root:root .
+find -L . \
+ \( -perm 777 -o -perm 775 -o -perm 750 -o -perm 711 -o -perm 555 \
+  -o -perm 511 \) -exec chmod 755 {} \+ -o \
+ \( -perm 666 -o -perm 664 -o -perm 640 -o -perm 600 -o -perm 444 \
+  -o -perm 440 -o -perm 400 \) -exec chmod 644 {} \+
+
+./bootstrap
+CFLAGS="$SLKCFLAGS" \
+CXXFLAGS="$SLKCXXFLAGS" \
+LDFLAGS="$SLDFLAGS" \
+./configure \
+  --prefix=/opt/ffmpeg \
+  --libdir=/opt/ffmpeg/lib${LIBDIRSUFFIX} \
+  --sysconfdir=/opt/ffmpeg/etc \
+  --localstatedir=/opt/ffmpeg/var \
+  --mandir=/opt/ffmpeg/man \
+  --docdir=/opt/ffmpeg/doc/$shinenam \
+  --enable-shared \
+  --disable-static
+
+make -j$nprocr
+make install DESTDIR=$PKG
+
+rm -f $PKG/opt/ffmpeg/lib${LIBDIRSUFFIX}/*.la
+
+mkdir -pv $PKG/usr/doc/$PRGNAM-$VERSION/$shinenam
+cp -av README.md COPYING $PKG/usr/doc/$PRGNAM-$VERSION/$shinenam
+
+cd $TMP
+
+# Building libaom
+
+rm -rf $aomnam-$aomver
+tar xvf $CWD/$aomnam-$aomver.tar.gz
+cd $aomnam-$aomver
+chown -R root:root .
+find -L . \
+ \( -perm 777 -o -perm 775 -o -perm 750 -o -perm 711 -o -perm 555 \
+  -o -perm 511 \) -exec chmod 755 {} \+ -o \
+ \( -perm 666 -o -perm 664 -o -perm 640 -o -perm 600 -o -perm 444 \
+  -o -perm 440 -o -perm 400 \) -exec chmod 644 {} \+
+
+cmake -B build -S $TMP/$aomnam-$aomver \
+    -DCMAKE_C_FLAGS:STRING="$SLKCFLAGS" \
+    -DCMAKE_CXX_FLAGS:STRING="$SLKCXXFLAGS" \
+    -DCMAKE_C_FLAGS_RELEASE:STRING="$SLKCFLAGS" \
+    -DCMAKE_CXX_FLAGS_RELEASE:STRING="$SLKCXXFLAGS" \
+    -DCMAKE_EXE_LINKER_FLAGS:STRING="$SLDFLAGS" \
+    -DCMAKE_INSTALL_PREFIX:PATH=/opt/ffmpeg \
+    -DCMAKE_INSTALL_LIBDIR:PATH=/opt/ffmpeg/lib${LIBDIRSUFFIX} \
+    -DCMAKE_INSTALL_BINDIR:PATH=/opt/ffmpeg/bin \
+    -DCMAKE_INSTALL_MANDIR:PATH=/opt/ffmpeg/man \
+    -DCMAKE_BUILD_TYPE:STRING=Release \
+    -DBUILD_SHARED_LIBS=1 \
+    -DCONFIG_MULTITHREAD=1 \
+    -DCONFIG_RUNTIME_CPU_DETECT=1 \
+    -DCONFIG_WEBM_IO=1 \
+    -DCONFIG_LIBYUV=1 \
+    -DCONFIG_TUNE_VMAF=1 \
+    -DENABLE_NASM=1 \
+    -DENABLE_DOCS=0 \
+    -DENABLE_TESTS=0 \
+    -DENABLE_CCACHE=0
+
+cmake --build build --parallel $nprocr
+DESTDIR=$PKG cmake --install build
+
+rm -f $PKG/opt/ffmpeg/lib${LIBDIRSUFFIX}/*.la
+
+mkdir -pv $PKG/usr/doc/$PRGNAM-$VERSION/$aomnam-$aomver
+cp -av LICENSE PATENTS README.md AUTHORS $PKG/usr/doc/$PRGNAM-$VERSION/$aomnam-$aomver
+
+cd $TMP
+
+# Building libopenmpt
+
+rm -rf $mptnam-$mptver+release.autotools
+tar xvf $CWD/$mptnam-$mptver+release.autotools.tar.gz
+cd $mptnam-$mptver+release.autotools
+chown -R root:root .
+find -L . \
+ \( -perm 777 -o -perm 775 -o -perm 750 -o -perm 711 -o -perm 555 \
+  -o -perm 511 \) -exec chmod 755 {} \+ -o \
+ \( -perm 666 -o -perm 664 -o -perm 640 -o -perm 600 -o -perm 444 \
+  -o -perm 440 -o -perm 400 \) -exec chmod 644 {} \+
+
+CFLAGS="$SLKCFLAGS" \
+CXXFLAGS="$SLKCXXFLAGS" \
+LDFLAGS="$SLDFLAGS" \
+./configure \
+  --prefix=/opt/ffmpeg \
+  --libdir=/opt/ffmpeg/lib${LIBDIRSUFFIX} \
+  --sysconfdir=/opt/ffmpeg/etc \
+  --localstatedir=/opt/ffmpeg/var \
+  --mandir=/opt/ffmpeg/man \
+  --docdir=/opt/ffmpeg/doc/$mptnam-$mptver \
+  --enable-shared \
+  --enable-openmpt123 \
+  --with-pulseaudio  \
+  --with-vorbisfile \
+  --with-sndfile \
+  --with-mpg123 \
+  --with-flac  \
+  --disable-static \
+  --disable-examples \
+  --disable-tests \
+  --disable-doxygen-doc \
+  --disable-doxygen-html \
+  --disable-doxygen-ps \
+  --disable-doxygen-pdf
+
+make -j$nprocr
+make install DESTDIR=$PKG
+
+rm -f $PKG/opt/ffmpeg/lib${LIBDIRSUFFIX}/*.la
+
+mkdir -pv $PKG/usr/doc/$PRGNAM-$VERSION/$mptnam-$mptver
+cp -av LICENSE README.md $PKG/usr/doc/$PRGNAM-$VERSION/$mptnam-$mptver
+
+cd $TMP
+
+# Building libcryptopp
+
+rm -rf $crypnam-$crypver
+tar xvf $CWD/$crypnam-$crypver.tar.gz
+cd $crypnam-$crypver
+chown -R root:root .
+find -L . \
+ \( -perm 777 -o -perm 775 -o -perm 750 -o -perm 711 -o -perm 555 \
+  -o -perm 511 \) -exec chmod 755 {} \+ -o \
+ \( -perm 666 -o -perm 664 -o -perm 640 -o -perm 600 -o -perm 444 \
+  -o -perm 440 -o -perm 400 \) -exec chmod 644 {} \+
+
+# From Slackware-current
+# Cater to 64-bit Slackware:
+sed -i -e "s|(PREFIX)/lib|(PREFIX)/lib${LIBDIRSUFFIX}|g" GNUmakefile
+
+make all dynamic libcryptopp.pc -j$nprocr CXXFLAGS="${SLKCXXFLAGS} -DNDEBUG" LDFLAGS="${SLDFLAGS}"
+make install-lib PREFIX=$PKG/opt/ffmpeg
+
+# Fix the installed pkg-config file:
+sed -i $PKG/opt/ffmpeg/lib${LIBDIRSUFFIX}/pkgconfig/libcryptopp.pc -e "s|/usr/local|/opt/ffmpeg|g"
+sed -i "s|^libdir=.*|libdir=\${prefix}/lib${LIBDIRSUFFIX}|" "$PKG/opt/ffmpeg/lib${LIBDIRSUFFIX}/pkgconfig/libcryptopp.pc"
+
+rm -f $PKG/opt/ffmpeg/lib${LIBDIRSUFFIX}/*.la
+
+mkdir -pv $PKG/usr/doc/$PRGNAM-$VERSION/$crypnam-$crypver
+cp -av License.txt $PKG/usr/doc/$PRGNAM-$VERSION/$crypnam-$crypver
+
+cd $TMP
+
+# Building codec2
+rm -rf $codnam-$codver
+tar xvf $CWD/$codnam-$codver.tar.gz
+cd $codnam-$codver
+chown -R root:root .
+find -L . \
+ \( -perm 777 -o -perm 775 -o -perm 750 -o -perm 711 -o -perm 555 \
+  -o -perm 511 \) -exec chmod 755 {} \+ -o \
+ \( -perm 666 -o -perm 664 -o -perm 640 -o -perm 600 -o -perm 444 \
+  -o -perm 440 -o -perm 400 \) -exec chmod 644 {} \+
+
+cmake -B build -S $TMP/$codnam-$codver \
+    -DCMAKE_C_FLAGS:STRING="$SLKCFLAGS" \
+    -DCMAKE_CXX_FLAGS:STRING="$SLKCXXFLAGS" \
+    -DCMAKE_C_FLAGS_RELEASE:STRING="$SLKCFLAGS" \
+    -DCMAKE_CXX_FLAGS_RELEASE:STRING="$SLKCXXFLAGS" \
+    -DCMAKE_EXE_LINKER_FLAGS:STRING="$SLDFLAGS" \
+    -DCMAKE_INSTALL_PREFIX=/opt/ffmpeg \
+    -DCMAKE_INSTALL_BINDIR=/opt/ffmpeg/bin \
+    -DLIB_SUFFIX=${LIBDIRSUFFIX} \
+    -DCMAKE_BUILD_TYPE=Release
+
+cmake --build build --parallel $nprocr
+DESTDIR=$PKG cmake --install build
+
+rm -f $PKG/opt/ffmpeg/lib${LIBDIRSUFFIX}/*.la
+
+mkdir -pv $PKG/usr/doc/$PRGNAM-$VERSION/$codnam-$codver
+cp -av COPYING README*.md $PKG/usr/doc/$PRGNAM-$VERSION/$codnam-$codver
+
+cd $TMP
+
+#Building libass
+
+rm -rf $assnam-$assver
+tar xvf $CWD/$assnam-$assver.tar.xz
+cd $assnam-$assver
+chown -R root:root .
+find -L . \
+ \( -perm 777 -o -perm 775 -o -perm 750 -o -perm 711 -o -perm 555 \
+  -o -perm 511 \) -exec chmod 755 {} \+ -o \
+ \( -perm 666 -o -perm 664 -o -perm 640 -o -perm 600 -o -perm 444 \
+  -o -perm 440 -o -perm 400 \) -exec chmod 644 {} \+
+
+CFLAGS="$SLKCFLAGS" \
+CXXFLAGS="$SLKCXXFLAGS" \
+LDFLAGS="$SLDFLAGS" \
+./configure \
+  --prefix=/opt/ffmpeg \
+  --libdir=/opt/ffmpeg/lib${LIBDIRSUFFIX} \
+  --sysconfdir=/opt/ffmpeg/etc \
+  --localstatedir=/opt/ffmpeg/var \
+  --mandir=/opt/ffmpeg/man \
+  --docdir=/opt/ffmpeg/doc/$assnam-$assver \
+  --enable-shared \
+  --enable-compare \
+  --enable-fontconfig \
+  --enable-libunibreak \
+  --with-gnu-ld   \
+  --disable-static \
+  --disable-profile \
+  --disable-fuzz \
+  --disable-coretext \
+  --disable-directwrite
+
+make -j$nprocr
+make install DESTDIR=$PKG
+
+rm -f $PKG/opt/ffmpeg/lib${LIBDIRSUFFIX}/*.la
+
+mkdir -pv $PKG/usr/doc/$PRGNAM-$VERSION/$assnam-$assver
+cp -av COPYING README.md MAINTAINERS $PKG/usr/doc/$PRGNAM-$VERSION/$assnam-$assver
+
+cd $TMP
+
+# Building libjxl
+rm -rf $jxlnam-$jxlver
+tar xvf $CWD/$jxlnam-$jxlver.tar.gz
+cd $jxlnam-$jxlver
+rm -rvf $TMP/$jxlnam-$jxlver/third_party/libjpeg-turbo/
+tar -xvf $CWD/$jpgnam-$jpgver.tar.gz
+cp -av $TMP/$jxlnam-$jxlver/$jpgnam-$jpgver/ $TMP/$jxlnam-$jxlver/third_party/libjpeg-turbo
+chown -R root:root .
+find -L . \
+ \( -perm 777 -o -perm 775 -o -perm 750 -o -perm 711 -o -perm 555 \
+  -o -perm 511 \) -exec chmod 755 {} \+ -o \
+ \( -perm 666 -o -perm 664 -o -perm 640 -o -perm 600 -o -perm 444 \
+  -o -perm 440 -o -perm 400 \) -exec chmod 644 {} \+
+
+cmake -B build -S $TMP/$jxlnam-$jxlver \
+    -DCMAKE_C_FLAGS:STRING="$SLKCFLAGS" \
+    -DCMAKE_CXX_FLAGS:STRING="$SLKCXXFLAGS" \
+    -DCMAKE_C_FLAGS_RELEASE:STRING="$SLKCFLAGS" \
+    -DCMAKE_CXX_FLAGS_RELEASE:STRING="$SLKCXXFLAGS" \
+    -DCMAKE_EXE_LINKER_FLAGS:STRING="$SLDFLAGS" \
+    -DCMAKE_INSTALL_PREFIX:PATH=/opt/ffmpeg \
+    -DCMAKE_INSTALL_LIBDIR:PATH=/opt/ffmpeg/lib${LIBDIRSUFFIX} \
+    -DCMAKE_INSTALL_BINDIR:PATH=/opt/ffmpeg/bin \
+    -DCMAKE_INSTALL_MANDIR:PATH=/opt/ffmpeg/man \
+    -DCMAKE_BUILD_TYPE:STRING=Release \
+    -DJPEGXL_VERSION=$jxlver \
+    -DJPEGXL_ENABLE_OPENEXR:BOOL=TRUE \
+    -DBUILD_SHARED_LIBS:BOOL=TRUE \
+    -DJPEGXL_ENABLE_TOOLS:BOOL=TRUE \
+    -DJPEGXL_FORCE_SYSTEM_BROTLI:BOOL=TRUE \
+    -DJPEGXL_FORCE_SYSTEM_HWY:BOOL=TRUE \
+    -DJPEGXL_FORCE_SYSTEM_LCMS2:BOOL=TRUE \
+    -DJPEGXL_ENABLE_TRANSCODE_JPEG=TRUE \
+    -DJPEGXL_ENABLE_BOXES=TRUE \
+    -DJPEGXL_ENABLE_JPEGLI=TRUE \
+    -DJPEGXL_ENABLE_JPEGLI_LIBJPEG:BOOL=FALSE \
+    -DJPEGXL_INSTALL_JPEGLI_LIBJPEG:BOOL=FALSE \
+    -DJPEGXL_STATIC:BOOL=FALSE \
+    -DJPEGXL_ENABLE_PLUGINS:BOOL=FALSE \
+    -DBUILD_TESTING:BOOL=FALSE \
+    -DENABLE_FUZZERS_DEFAULT:BOOL=FALSE \
+    -DBUNDLE_LIBPNG_DEFAULT:BOOL=FALSE \
+    -DJPEGXL_ENABLE_JNI:BOOL=FALSE \
+    -DJPEGXL_ENABLE_DEVTOOLS:BOOL=FALSE \
+    -DJPEGXL_ENABLE_DOXYGEN:BOOL=FALSE \
+    -DJPEGXL_ENABLE_SKCMS:BOOL=FALSE \
+    -DJPEGXL_BUNDLE_SKCMS:BOOL=FALSE \
+    -DJPEGXL_ENABLE_BENCHMARK:BOOL=FALSE \
+    -DJPEGXL_ENABLE_EXAMPLES:BOOL=FALSE \
+    -DJPEGXL_ENABLE_FUZZERS:BOOL=FALSE \
+    -DJPEGXL_ENABLE_VIEWERS:BOOL=FALSE \
+    -DJPEGXL_ENABLE_SIZELESS_VECTORS:BOOL=FALSE \
+    -DJPEGXL_WARNINGS_AS_ERRORS:BOOL=FALSE \
+    -DJPEGXL_ENABLE_SJPEG:BOOL=FALSE \
+    -DCMAKE_DISABLE_FIND_PACKAGE_JPEG:BOOL=FALSE \
+    -DJPEGXL_ENABLE_MANPAGES:BOOL=FALSE \
+    -DJPEGXL_ENABLE_TCMALLOC:BOOL=FALSE \
+    -DJPEGXL_ENABLE_PLUGIN_GDKPIXBUF:BOOL=FALSE \
+    -DJPEGXL_FORCE_SYSTEM_GTEST:BOOL=FALSE \
+    -DJPEGXL_TEST_TOOLS=FALSE \
+    -DJPEGXL_ENABLE_COVERAGE=FALSE \
+    -DJPEGXL_ENABLE_WASM_THREADS=FALSE
+
+cmake --build build --parallel $nprocr
+DESTDIR=$PKG cmake --install build
+
+rm -f $PKG/opt/ffmpeg/lib${LIBDIRSUFFIX}/*.la
+
+mkdir -pv $PKG/usr/doc/$PRGNAM-$VERSION/$jxlnam-$jxlver
+cp -av AUTHORS CONTRIBUTORS LICENSE PATENTS README.md $PKG/usr/doc/$PRGNAM-$VERSION/$jxlnam-$jxlver
+
+cd $TMP
+
+# Building snappy
+rm -rf $snanam-$snaver
+tar xvf $CWD/$snanam-$snaver.tar.gz
+cd $snanam-$snaver
+chown -R root:root .
+find -L . \
+ \( -perm 777 -o -perm 775 -o -perm 750 -o -perm 711 -o -perm 555 \
+  -o -perm 511 \) -exec chmod 755 {} \+ -o \
+ \( -perm 666 -o -perm 664 -o -perm 640 -o -perm 600 -o -perm 444 \
+  -o -perm 440 -o -perm 400 \) -exec chmod 644 {} \+
+
+cmake -B build -S $TMP/$snanam-$snaver \
+    -DCMAKE_C_FLAGS:STRING="$SLKCFLAGS" \
+    -DCMAKE_CXX_FLAGS:STRING="$SLKCXXFLAGS" \
+    -DCMAKE_C_FLAGS_RELEASE:STRING="$SLKCFLAGS" \
+    -DCMAKE_CXX_FLAGS_RELEASE:STRING="$SLKCXXFLAGS" \
+    -DCMAKE_EXE_LINKER_FLAGS:STRING="$SLDFLAGS" \
+    -DCMAKE_INSTALL_PREFIX:PATH=/opt/ffmpeg \
+    -DCMAKE_INSTALL_LIBDIR:PATH=/opt/ffmpeg/lib${LIBDIRSUFFIX} \
+    -DCMAKE_INSTALL_BINDIR:PATH=/opt/ffmpeg/bin \
+    -DCMAKE_INSTALL_MANDIR:PATH=/opt/ffmpeg/man \
+    -DCMAKE_BUILD_TYPE:STRING=Release \
+    -DSNAPPY_BUILD_TESTS=OFF \
+    -DSNAPPY_BUILD_BENCHMARKS=OFF \
+    -DBUILD_SHARED_LIBS=ON
+
+cmake --build build --parallel $nprocr
+DESTDIR=$PKG cmake --install build
+
+rm -f $PKG/opt/ffmpeg/lib${LIBDIRSUFFIX}/*.la
+
+mkdir -pv $PKG/usr/doc/$PRGNAM-$VERSION/$snanam-$snaver
+cp -av AUTHORS COPYING README.md $PKG/usr/doc/$PRGNAM-$VERSION/$snanam-$snaver
+
+cd $TMP
+
+# Building libmodplug
+rm -rf $modpnam-$modpver
+tar xvf $CWD/$modpnam-$modpver.tar.gz
+cd $modpnam-$modpver
+chown -R root:root .
+find -L . \
+ \( -perm 777 -o -perm 775 -o -perm 750 -o -perm 711 -o -perm 555 \
+  -o -perm 511 \) -exec chmod 755 {} \+ -o \
+ \( -perm 666 -o -perm 664 -o -perm 640 -o -perm 600 -o -perm 444 \
+  -o -perm 440 -o -perm 400 \) -exec chmod 644 {} \+
+
+# Fix end-of-line encoding.
+for i in ChangeLog; do
+  sed -e 's/\r//' $i > ${i}.new
+  touch -r $i ${i}.new
+  mv ${i}.new $i
+done
+
+patch -p1 < $CWD/patches/libmodplug-0.8.4-timiditypaths.patch
+
+CFLAGS="$SLKCFLAGS" \
+CXXFLAGS="$SLKCXXFLAGS" \
+LDFLAGS="$SLDFLAGS" \
+./configure \
+  --prefix=/opt/ffmpeg \
+  --libdir=/opt/ffmpeg/lib${LIBDIRSUFFIX} \
+  --sysconfdir=/opt/ffmpeg/etc \
+  --localstatedir=/opt/ffmpeg/var \
+  --mandir=/opt/ffmpeg/man \
+  --docdir=/opt/ffmpeg/doc/$PRGNAM-$VERSION \
+  --disable-silent-rules
+
+make -j$nprocr
+make install DESTDIR=$PKG
+
+rm -f $PKG/opt/ffmpeg/lib${LIBDIRSUFFIX}/*.la
+
+mkdir -pv $PKG/usr/doc/$PRGNAM-$VERSION/$modpnam-$modpver
+cp -a AUTHORS ChangeLog COPYING README $PKG/usr/doc/$PRGNAM-$VERSION/$modpnam-$modpver
+
+cd $TMP
+
+# Building libklvanc
+
+rm -rf $vancnam-$vancver
+tar xvf $CWD/$vancnam-$vancom.tar.gz
+cd $vancnam-$vancver
+chown -R root:root .
+find -L . \
+ \( -perm 777 -o -perm 775 -o -perm 750 -o -perm 711 -o -perm 555 \
+  -o -perm 511 \) -exec chmod 755 {} \+ -o \
+ \( -perm 666 -o -perm 664 -o -perm 640 -o -perm 600 -o -perm 444 \
+  -o -perm 440 -o -perm 400 \) -exec chmod 644 {} \+
+
+./autogen.sh --build
+CFLAGS="$SLKCFLAGS" \
+CXXFLAGS="$SLKCXXFLAGS" \
+LDFLAGS="$SLDFLAGS" \
+./configure \
+  --prefix=/opt/ffmpeg \
+  --libdir=/opt/ffmpeg/lib${LIBDIRSUFFIX} \
+  --sysconfdir=/opt/ffmpeg/etc \
+  --localstatedir=/opt/ffmpeg/var \
+  --mandir=/opt/ffmpeg/man \
+  --docdir=/opt/ffmpeg/doc/$vancnam \
+  --with-gnu-ld  \
+  --disable-debug \
+  --disable-static
+
+make -j$nprocr
+make -C $TMP/$vancnam-$vancver DESTDIR=$PKG install
+
+rm -f $PKG/opt/ffmpeg/lib${LIBDIRSUFFIX}/*.la
+
+mkdir -pv $PKG/usr/doc/$PRGNAM-$VERSION/$vancnam
+cp -av README.md lgpl-2.1.txt  $PKG/usr/doc/$PRGNAM-$VERSION/$vancnam
+
+cd $TMP
+
+# Building librist
+
+rm -rf $ristnam-v$ristver
+tar xvf $CWD/$ristnam-v$ristver.tar.gz
+cd $ristnam-v$ristver
+chown -R root:root .
+find -L . \
+ \( -perm 777 -o -perm 775 -o -perm 750 -o -perm 711 -o -perm 555 \
+  -o -perm 511 \) -exec chmod 755 {} \+ -o \
+ \( -perm 666 -o -perm 664 -o -perm 640 -o -perm 600 -o -perm 444 \
+  -o -perm 440 -o -perm 400 \) -exec chmod 644 {} \+
+
+CFLAGS="$SLKCFLAGS" CXXFLAGS="$SLKCXXFLAGS" LDFLAGS="$SLDFLAGS" meson setup build $TMP/$ristnam-v$ristver \
+    --prefix=/opt/ffmpeg \
+    --libdir=/opt/ffmpeg/lib${LIBDIRSUFFIX} \
+    --localstatedir=/opt/ffmpeg/var \
+    --mandir=/opt/ffmpeg/man \
+    --sysconfdir=/opt/ffmpeg/etc \
+    --buildtype=release \
+    -Dstrip=true \
+    -Dtest=false \
+    -Dbuiltin_mbedtls=true \
+    -Dbuiltin_cjson=true \
+    -Dallow_obj_filter=true
+
+ninja -j$nprocr -v -C build
+DESTDIR=$PKG ninja -v -C build install
+
+rm -f $PKG/opt/ffmpeg/lib${LIBDIRSUFFIX}/*.la
+
+mkdir -pv $PKG/usr/doc/$PRGNAM-$VERSION/$ristnam-$ristver
+cp -a COPYING NEWS README.md THANKS.md  $PKG/usr/doc/$PRGNAM-$VERSION/$ristnam-$ristver
+
+cd $TMP
+
+find $PKG -print0 | xargs -0 file | grep -e "executable" -e "shared object" | grep ELF \
+  | cut -f 1 -d : | xargs strip --strip-unneeded --remove-section=.comment --remove-section=.note 2> /dev/null || true
+
+find $PKG/opt/ffmpeg/man -type f -exec gzip -9 {} \;
+for i in $( find $PKG/opt/ffmpeg/man -type l ) ; do ln -s $( readlink $i ).gz $i.gz ; rm $i ; done
+
+cat $CWD/$PRGNAM.SlackBuild > $PKG/usr/doc/$PRGNAM-$VERSION/$PRGNAM.SlackBuild
+find $PKG/opt/ffmpeg/lib${LIBDIRSUFFIX} -type f -exec chmod 0755 {} \+
+find $PKG/usr/doc/$PRGNAM-$VERSION -type f -exec chmod 0644 {} \+
+
+mkdir -pv $PKG/install
+cat $CWD/slack-desc > $PKG/install/slack-desc
+
+cd $PKG
+/sbin/makepkg -l y -c n --remove-rpaths --remove-tmp-rpaths --threads 5 $OUTPUT/$PRGNAM-$VERSION-$ARCH-$BUILD$TAG.$PKGTYPE

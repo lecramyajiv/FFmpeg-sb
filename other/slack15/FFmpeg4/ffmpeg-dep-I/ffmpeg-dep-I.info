@@ -1,0 +1,39 @@
+PRGNAM="ffmpeg-dep-I"
+VERSION="1.0"
+HOMEPAGE="https://ffmpeg.org"
+DOWNLOAD=""
+MD5SUM=""
+DOWNLOAD_x86_64="https://github.com/AviSynth/AviSynthPlus/archive/v3.7.5/AviSynthPlus-3.7.5.tar.gz https://github.com/drowe67/LPCNet/archive/v0.5/LPCNet-0.5.tar.gz https://github.com/abseil/abseil-cpp/archive/20211102.0/abseil-cpp-20211102.0.tar.gz https://github.com/nkoriyama/aribb24/archive/v1.0.3/aribb24-1.0.3.tar.gz https://github.com/acoustid/chromaprint/releases/download/v1.5.1/chromaprint-1.5.1.tar.gz https://code.videolan.org/videolan/dav1d/-/archive/1.5.1/dav1d-1.5.1.tar.gz https://github.com/pkuvcl/davs2/archive/1.7/davs2-1.7.tar.gz https://github.com/mstorsjo/fdk-aac/archive/v2.0.3/fdk-aac-2.0.3.tar.gz https://github.com/libgme/game-music-emu/archive/0.6.4/game-music-emu-0.6.4.tar.gz https://www.quut.com/gsm/gsm-1.0.22.tar.gz https://www.ladspa.org/download/ladspa_sdk_1.17.tgz https://downloads.sourceforge.net/libavc1394/libavc1394-0.5.4.tar.gz https://sourceforge.net/projects/bs2b/files/libbs2b/3.1.0/libbs2b-3.1.0.tar.bz2 https://downloads.sourceforge.net/libdc1394/libdc1394-2.2.7.tar.gz https://www.kernel.org/pub/linux/libs/ieee1394/libiec61883-1.2.0.tar.xz https://github.com/TimothyGu/libilbc/archive/v3.0.4/libilbc-3.0.4.tar.gz https://ftpmirror.gnu.org/libmicrohttpd/libmicrohttpd-1.0.1.tar.gz https://github.com/adah1972/libunibreak/releases/download/libunibreak_6_1/libunibreak-6.1.tar.gz https://downloads.sourceforge.net/opencore-amr/opencore-amr-0.1.6.tar.gz https://github.com/PortAudio/portaudio/archive/v19.7.0/portaudio-19.7.0.tar.gz https://downloads.sourceforge.net/project/soxr/soxr-0.1.3-Source.tar.xz https://github.com/Haivision/srt/archive/v1.5.4/srt-1.5.4.tar.gz https://github.com/njh/twolame/releases/download/0.4.0/twolame-0.4.0.tar.gz https://github.com/Netflix/vmaf/archive/v3.0.0/vmaf-3.0.0.tar.gz https://downloads.sourceforge.net/sourceforge/opencore-amr/vo-amrwbenc/vo-amrwbenc-0.1.3.tar.gz https://downloads.xvid.com/downloads/xvidcore-1.3.7.tar.gz https://github.com/zeromq/libzmq/releases/download/v4.3.5/zeromq-4.3.5.tar.gz https://github.com/sekrit-twc/zimg/archive/release-3.0.5/zimg-release-3.0.5.tar.gz https://sourceforge.net/projects/zapping/files/zvbi/0.2.35/zvbi-0.2.35.tar.bz2 https://github.com/quietvoid/dovi_tool/archive/2.1.3/dovi_tool-2.1.3.tar.gz"
+MD5SUM_x86_64="ef61480836576a9d8db3530f7aec040e \
+               5960a002a46e8df245f0294ba3a1c832 \
+               bdca561519192543378b7cade101ec43 \
+               5ef0a6d1d72f294666ee1489b7ebb8c5 \
+               54e71f86bcf1d34989db639044ba9628 \
+               e919dd18e2d834abe007bdf7d973a2f0 \
+               d1558a5413b6691ad9c867cbd5c765aa \
+               fbaf688a6fd6ddf63c68566909a178b4 \
+               9d513a1488670fdd5fa86fad462cf570 \
+               fcca74c770a341d78ea4604418c1264b \
+               f4a2fb40405d1fc746d10fe0d3536db1 \
+               caf0db059d8b8d35d6f08e6c0e1c7dfe \
+               c1486531d9e23cf34a1892ec8d8bfc06 \
+               003856054d39f12c18ab9e0f1e527e2c \
+               ed91bc1727fac8e019402fc3724a283d \
+               0aa7c3d20d4d6901ad50e42b5d12201d \
+               b41c83799a478ea9c774e50ed22446bc \
+               8df410d010e03de1a339a400a920335e \
+               03de025060a4f16c4c44218f65e13e95 \
+               49ecd6de2350b3a1466116538f7be0e7 \
+               3f16f4dcb35b471682d4321eda6f6c08 \
+               08e946bbcdb6f9dc3863de5dd8a48aa3 \
+               400c164ed096c7aea82bcf8edcd3f6f9 \
+               dfd67ebfbfcb66ce76abc56fde0df06f \
+               f63bb92bde0b1583cb3cb344c12922e0 \
+               5c6c19324608ac491485dbb27d4da517 \
+               ae933b1e98411fd7cb8309f9502d2737 \
+               af2c08cc0e695f4c0c225feed14e9f20 \
+               95e53eb208c65ba6667fd4341455fa27 \
+               55630cf592abeb9660b9a2fb6fc38268"
+REQUIRES="ffmpeg-dep-O valgrind"
+MAINTAINER="Vijay Marcel"
+EMAIL="vijaymarcel@outlook.com"

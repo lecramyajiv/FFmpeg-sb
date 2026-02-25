@@ -1,0 +1,135 @@
+#!/bin/bash
+
+# Slackware build script for x265
+
+# Copyright 2024 Vijay Marcel
+# All rights reserved.
+#
+# Redistribution and use of this script, with or without modification, is
+# permitted provided that the following conditions are met:
+#
+# 1. Redistributions of this script must retain the above copyright
+#    notice, this list of conditions and the following disclaimer.
+#
+#  THIS SOFTWARE IS PROVIDED BY THE AUTHOR "AS IS" AND ANY EXPRESS OR IMPLIED
+#  WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+#  MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO
+#  EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+#  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+#  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
+#  OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+#  WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
+#  OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
+#  ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+cd $(dirname $0) ; CWD=$(pwd)
+
+PRGNAM=x265
+VERSION=${VERSION:-4.0}
+BUILD=${BUILD:-1}
+TAG=${TAG:-_SBo}
+PKGTYPE=${PKGTYPE:-tgz}
+
+if [ -z "$ARCH" ]; then
+  case "$( uname -m )" in
+    i?86) ARCH=i586 ;;
+    arm*) ARCH=arm ;;
+       *) ARCH=$( uname -m ) ;;
+  esac
+fi
+
+if [ ! -z "${PRINT_PACKAGE_NAME}" ]; then
+  echo "$PRGNAM-$VERSION-$ARCH-$BUILD$TAG.$PKGTYPE"
+  exit 0
+fi
+
+TMP=${TMP:-/tmp/SBo}
+PKG=$TMP/package-$PRGNAM
+OUTPUT=${OUTPUT:-/tmp}
+
+if [ "$ARCH" = "x86_64" ]; then
+  SLKCFLAGS="-std=gnu++17 -Wp,-D_GLIBCXX_ASSERTIONS -march=x86-64 -mtune=generic -pipe -O2 -fPIC"
+  LIBDIRSUFFIX="64"
+  SLDFLAG="-lvmaf -lm -Wl,-z,relro -Wl,-z,now -Wl,-z,noexecstack -Wl,-z,defs"
+else
+  SLKCFLAGS="-O2"
+  LIBDIRSUFFIX=""
+fi
+
+set -e
+trap 'echo "$0 FAILED at line $LINENO!" | tee -a $OUTPUT/error-${PRGNAM}.log' ERR
+
+rm -rf $PKG
+mkdir -p $TMP $PKG $OUTPUT
+cd $TMP
+rm -rf ${PRGNAM}_${VERSION}
+tar xvf $CWD/${PRGNAM}_${VERSION}.tar.gz
+cd ${PRGNAM}_${VERSION}
+chown -R root:root .
+find -L . \
+ \( -perm 777 -o -perm 775 -o -perm 750 -o -perm 711 -o -perm 555 \
+  -o -perm 511 \) -exec chmod 755 {} \; -o \
+ \( -perm 666 -o -perm 664 -o -perm 640 -o -perm 600 -o -perm 444 \
+  -o -perm 440 -o -perm 400 \) -exec chmod 644 {} \;
+
+export CC=gcc
+export CXX=g++
+
+export b=${b:-/opt/bin}
+export s=${s:-/opt/share}
+export l=${l:-/opt/lib64}
+export i=${i:-/opt/include/}
+export c=${c:-$s/cmake}
+export m=${m:-$s/Modules}
+export vmf=${vmf:-/usr/share/vmaf-3.0.0/model}
+export vmf1=${vmf1:-$vmf/other_models}
+export vmf2=${vmf2:-$vmf/vmaf_4k_rb_v0.6.2}
+export vmf3=${vmf3:-$vmf/vmaf_float_b_v0.6.3}
+export vmf4=${vmf4:-$vmf/vmaf_rb_v0.6.2}
+export vmf5=${vmf5:-$vmf/vmaf_rb_v0.6.3}
+
+
+export PATH=$b:$s:$l:$i:$c:$m:$vmf:$vmf1:$vmf2:$vmf3:$vmf4:$vmf5:$PATH
+export PKG_CONFIG_PATH=$l:$PKG_CONFIG_PATH
+export LD_LIBRARY_PATH=$l:$LD_LIBRARY_PATH
+
+# x265 needs the precise svt-hevc version 1.4.1 otherwise it results in error
+# Do not enable assembly code generation it will cause error at linking
+
+cmake -B build -S $TMP/${PRGNAM}_${VERSION}/source -G Ninja \
+    -DCMAKE_C_FLAGS:STRING="$SLKCFLAGS" \
+    -DCMAKE_CXX_FLAGS:STRING="$SLKCFLAGS" \
+    -DCMAKE_SHARED_LINKER_FLAGS="$SLDFLAG" \
+    -DCMAKE_INSTALL_PREFIX=/usr \
+    -DLIB_INSTALL_DIR=lib${LIBDIRSUFFIX} \
+    -DBIN_INSTALL_DIR=/usr/bin \
+    -DENABLE_LIBNUMA:BOOL=ON \
+    -DENABLE_LIBVMAF:BOOL=ON \
+    -DHIGH_BIT_DEPTH:BOOL=ON \
+    -DENABLE_HDR10_PLUS:BOOL=ON \
+    -DMAIN12=ON \
+    -DENABLE_SVT_HEVC:BOOL=OFF \
+    -DENABLE_ASSEMBLY:BOOL=OFF \
+    -DEXPORT_C_API:BOOL=ON \
+    -DENABLE_CLI:BOOL=ON \
+    -DENABLE_ALPHA:BOOL=ON \
+    -DENABLE_MULTIVIEW:BOOL=ON \
+    -DENABLE_SCC_EXT:BOOL=ON \
+    -DENABLE_SHARED:BOOL=ON \
+    -DCMAKE_BUILD_TYPE=Release
+
+ninja -C build
+DESTDIR=$PKG ninja -C build install
+
+find $PKG -print0 | xargs -0 file | grep -e "executable" -e "shared object" | grep ELF \
+  | cut -f 1 -d : | xargs strip --strip-unneeded --remove-section=.comment --remove-section=.note 2> /dev/null || true
+
+mkdir -p $PKG/usr/doc/$PRGNAM-$VERSION
+cp -a COPYING doc/intra/* $PKG/usr/doc/$PRGNAM-$VERSION
+cat $CWD/$PRGNAM.SlackBuild > $PKG/usr/doc/$PRGNAM-$VERSION/$PRGNAM.SlackBuild
+
+mkdir -p $PKG/install
+cat $CWD/slack-desc > $PKG/install/slack-desc
+
+cd $PKG
+/sbin/makepkg -l y -c n --remove-rpaths --remove-tmp-rpaths $OUTPUT/$PRGNAM-$VERSION-$ARCH-$BUILD$TAG.$PKGTYPE
