@@ -1,0 +1,10 @@
+ffmpeg
+gst-plugins-good
+gst-plugins-bad
+gst-plugins-ugly
+luajit
+mujs
+yt-dlp
+fzf-bin
+mpv
+mpc-qt 

@@ -1,0 +1,210 @@
+#!/bin/bash
+
+# Slackware build script for mpv
+
+# Copyright 2015 John Vogel Corning, NY USA
+# Copyright 2017,2018 (versions 0.25.0-0.29.1) Andreas Guldstrand
+# Copyright 2020-2024 Christoph Willing  Sydney Australia
+# Copyright 2025 Vijay Marcel
+# All rights reserved.
+#
+# Redistribution and use of this script, with or without modification, is
+# permitted provided that the following conditions are met:
+#
+# 1. Redistributions of this script must retain the above copyright
+#    notice, this list of conditions and the following disclaimer.
+#
+#  THIS SOFTWARE IS PROVIDED BY THE AUTHOR "AS IS" AND ANY EXPRESS OR IMPLIED
+#  WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+#  MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO
+#  EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+#  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+#  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
+#  OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+#  WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
+#  OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
+#  ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+# 20241009 bkw: Modified by SlackBuilds.org, BUILD=2:
+# - Bump BUILD for luajit-2.1.x
+
+cd $(dirname $0) ; CWD=$(pwd)
+
+PRGNAM=mpv
+VERSION=${VERSION:-0.38.0}
+BUILD=${BUILD:-8}
+TAG=${TAG:-_SBo}
+PKGTYPE=${PKGTYPE:-tgz}
+nprocr=$(expr $(nproc))
+sys_arch=${sys_arch:-$(uname -m)}
+
+case "$sys_arch" in
+   	x86_64) export ARCH=x86_64 ;;
+	     *) echo "This SlackBuild will not run on $sys_arch platform" && exit 1 ;;
+esac
+
+if [ ! -z "${PRINT_PACKAGE_NAME}" ]; then
+  echo "$PRGNAM-$VERSION-$ARCH-$BUILD$TAG.$PKGTYPE"
+  exit 0
+fi
+
+TMP=${TMP:-/tmp/SBo}
+PKG=$TMP/package-$PRGNAM
+OUTPUT=${OUTPUT:-/tmp}
+
+# --Wno-incompatible-pointer-types is valid only for C/objC and not for C++
+if [ "$ARCH" = "x86_64" ]; then
+  LIBDIRSUFFIX="64"
+  INCFLAGS="-I/opt/ffmpeg/include -I/opt/ffmpeg/include/lensfun"
+  PFLAGS="-fno-delete-null-pointer-checks -Wno-incompatible-pointer-types -Wno-implicit-function-declaration"
+  PXXFLAGS="-fno-delete-null-pointer-checks -Wno-implicit-function-declaration"
+  ARCHFLAGS="-march=x86-64 -mtune=native -pipe -ffunction-sections -fdata-sections -O2 -fPIC"
+  GCFLAGS="-Wl,--sort-common=ascending -Wl,--sort-section=alignment -Wl,--gc-sections -Wl,-z,unique-symbol"
+  DF="-L/opt/ffmpeg/lib${LIBDIRSUFFIX} -L/opt/ffmpeg/lib"
+  SLKCFLAGS="$INCFLAGS $ARCHFLAGS $PFLAGS"
+  SLKCXXFLAGS="$INCFLAGS $ARCHFLAGS $PXXFLAGS"
+  SLDFLAGS="$GCFLAGS $DF"
+else  echo "this slackbuild will work only on $ARCH" && exit 1
+fi
+
+set -e
+trap 'echo "$0 FAILED at line $LINENO!" | tee -a $OUTPUT/error-${PRGNAM}.log' ERR
+
+export CC=${CC:-gcc}
+export CXX=${CXX:-g++}
+export CFLAGS="$SLKCFLAGS"
+export CXXFLAGS="$SLKCXXFLAGS"
+export LDFLAGS="$SLDFLAGS"
+
+export pk=${pk:-/opt/ffmpeg/lib${LIBDIRSUFFIX}/pkgconfig}  # dep pkgconfig files
+export l=${l:-/opt/ffmpeg/lib${LIBDIRSUFFIX}}  # dep libraries
+export inc=${inc:-/opt/ffmpeg/include}  # dep headers
+export bin=${bin:-/opt/ffmpeg/bin} # dep binaries
+export cl=/opt/ffmpeg/lib64/cmake  # deps .cmake path
+export sh=/opt/ffmpeg/share
+export shc=/opt/ffmpeg/share/cmake
+export shp=/opt/ffmpeg/share/pkgconfig
+export m=/opt/meson/bin # meson path
+
+PYVER=$(python3 -c 'import sys; print("%d.%d" % sys.version_info[:2])')
+export PYTHONPATH=/opt/python$PYVER/site-packages
+export PKG_CONFIG_PATH=$pk:$cl:$shc:$shp:$sh:$PKG_CONFIG_PATH
+export LD_LIBRARY_PATH=$l:$LD_LIBRARY_PATH
+export PATH=$l:$pk:$inc:$bin:$cl:$m:$shc:$shp:$sh:$PATH
+
+rm -rf $PKG
+mkdir -p $TMP $PKG $OUTPUT
+mkdir -pv $PKG/usr/doc/$PRGNAM-$VERSION
+mkdir -pv $PKG/etc
+
+cd $TMP
+rm -rf $PRGNAM-$VERSION
+tar xvf $CWD/$PRGNAM-$VERSION.tar.gz
+cd $PRGNAM-$VERSION
+
+chown -R root:root .
+find -L . \
+ \( -perm 777 -o -perm 775 -o -perm 750 -o -perm 711 -o -perm 555 \
+  -o -perm 511 \) -exec chmod 755 {} \+ -o \
+ \( -perm 666 -o -perm 664 -o -perm 640 -o -perm 600 -o -perm 444 \
+  -o -perm 440 -o -perm 400 \) -exec chmod 644 {} \+
+
+
+DOCS="Copyright LICENSE.GPL LICENSE.LGPL README.md RELEASE_NOTES"
+MANUAL="DOCS/*.md DOCS/*.rst DOCS/*.txt"
+
+CFLAGS="$SLKCFLAGS" \
+CXXFLAGS="$SLKCXXFLAGS" \
+LDFLAGS="$SLDFLAGS -ldl" \
+meson setup build $TMP/$PRGNAM-$VERSION \
+  --prefix=/usr \
+  --libdir=/usr/lib${LIBDIRSUFFIX} \
+  --sysconfdir=/etc \
+  --mandir=/usr/man \
+  -Dbuildtype=release \
+  -Dlibmpv=true \
+  -Dvaapi=enabled \
+  -Dvaapi-drm=enabled \
+  -Dvaapi-wayland=enabled \
+  -Dvaapi-x11=enabled \
+  -Dplain-gl=enabled \
+  -Dvdpau=enabled \
+  -Dvdpau-gl-x11=enabled \
+  -Dcdda=enabled \
+  -Ddvdnav=enabled \
+  -Ddvbin=enabled \
+  -Djavascript=enabled \
+  -Dcplugins=enabled \
+  -Dlibavdevice=enabled \
+  -Dlibarchive=enabled \
+  -Dpipewire=disabled \
+  -Dopenal=enabled \
+  -Dsdl2=enabled \
+  -Dsdl2-audio=enabled \
+  -Dsdl2-gamepad=enabled \
+  -Dsdl2-video=enabled \
+  -Dlibbluray=enabled \
+  -Dvapoursynth=enabled \
+  -Drubberband=enabled \
+  -Dzimg=enabled \
+  -Dzlib=enabled \
+  -Duchardet=enabled \
+  -Dvulkan=enabled \
+  -Dsixel=enabled \
+  -Dalsa=enabled \
+  -Dpulse=enabled \
+  -Dgl-x11=enabled \
+  -Dx11=enabled \
+  -Ddrm=enabled \
+  -Duwp=disabled \
+  -Dwin32-threads=disabled \
+  -Daudiounit=disabled \
+  -Dcoreaudio=disabled \
+  -Davfoundation=disabled \
+  -Djack=disabled \
+  -Doss-audio=disabled \
+  -Dsndio=disabled \
+  -Dwasapi=disabled \
+  -Dcocoa=disabled \
+  -Dgl-cocoa=disabled \
+  -Dgl-dxinterop=disabled \
+  -Dgl-win32=disabled \
+  -Dd3d11=disabled \
+  -Ddirect3d=disabled \
+  -Dvaapi-win32=disabled \
+  -Dandroid-media-ndk=disabled \
+  -Dhtml-build=disabled \
+  -Dmanpage-build=disabled 2>&1 | tee $OUTPUT/configure-$PRGNAM.log
+
+ninja -j$nprocr -v -C build 2>&1 | tee $OUTPUT/build-$PRGNAM.log
+DESTDIR=$PKG ninja -v -C build install 2>&1 | tee $OUTPUT/install-$PRGNAM.log
+
+rm -f $PKG/usr/lib${LIBDIRSUFFIX}/*.la
+
+for f in $PKG/etc/mpv/*.conf ; do
+  mv $f{,.new}
+done
+
+find $PKG -print0 | xargs -0 file | grep -e "executable" -e "shared object" \
+  | grep ELF | cut -f 1 -d : | xargs strip --strip-unneeded --remove-section=.comment --remove-section=.note 2> /dev/null || true
+
+rm -rvf $PKG/usr/share/applications/mpv.desktop
+install -Dvm 0644 $CWD/mpv.desktop -t $PKG/usr/share/applications
+
+mkdir -p $PKG/usr/doc/$PRGNAM-$VERSION
+cp -a $DOCS $PKG/usr/doc/$PRGNAM-$VERSION
+mkdir -p $PKG/usr/doc/$PRGNAM-$VERSION/manual
+for f in $MANUAL; do
+  cp -a $f $PKG/usr/doc/$PRGNAM-$VERSION/manual/
+done
+
+cp -a $PKG/usr/share/doc/$PRGNAM/* $PKG/usr/doc/$PRGNAM-$VERSION
+rm -rf $PKG/usr/share/doc
+cat $CWD/$PRGNAM.SlackBuild > $PKG/usr/doc/$PRGNAM-$VERSION/$PRGNAM.SlackBuild
+
+mkdir -p $PKG/install
+cat $CWD/slack-desc > $PKG/install/slack-desc
+cat $CWD/doinst.sh > $PKG/install/doinst.sh
+
+cd $PKG
+/sbin/makepkg -l y -c n --remove-rpaths --remove-tmp-rpaths $OUTPUT/$PRGNAM-$VERSION-$ARCH-$BUILD$TAG.$PKGTYPE

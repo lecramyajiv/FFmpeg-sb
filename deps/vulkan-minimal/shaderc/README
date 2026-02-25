@@ -1,5 +1,0 @@
-Collection of tools, libraries and tests for shader compilation
-
-This will directly download glslang,spirv-tools and spirv-headers
-from within the slackbuild.
-

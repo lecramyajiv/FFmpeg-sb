@@ -1,8 +1,0 @@
-mpc-qt is Qt based mpv frontend on the style of
-Media player classic player.
-
-This uses the latest Qt binary modules.Use the qt-bin
-modules from lecramyajiv/Qt-lts github repo.
-
-if for some it results in error manually export $PATH
-and $LD_LIBRARY_PATH before running the slackbuild

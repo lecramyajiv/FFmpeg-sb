@@ -1,8 +1,0 @@
-OpenCV is a library of programming functions mainly
-aimed at real-time computer vision.
-
-numpy (for the python bindings), ceres-solver and qt5 
-are optional dependencies.FFmpeg is disabled in this 
-build.
-
-This is an optional dependency for ffmpeg

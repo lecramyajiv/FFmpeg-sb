@@ -1,7 +1,0 @@
-Libklvanc is a library which can be used for parsing/generation
-of Vertical Ancillary Data (VANC) commonly found in the
-Serial Digital Interface (SDI) wire protocol.
-The library includes a general parser/decoder and an encoder for
-VANC lines, as well as the ability to both decode and
-generate protocols commonly found in SDI.
-

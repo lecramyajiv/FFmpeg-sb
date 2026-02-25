@@ -1,0 +1,33 @@
+PRGNAM="ffmpeg-dep-II"
+VERSION="1.0"
+HOMEPAGE="https://ffmpeg.org"
+DOWNLOAD=""
+MD5SUM=""
+DOWNLOAD_x86_64="https://github.com/drowe67/codec2/archive/1.2.0/codec2-1.2.0.tar.gz https://github.com/pytorch/cpuinfo/archive/de0ce7c/cpuinfo-de0ce7c.tar.gz https://github.com/festvox/flite/archive/v2.2/flite-2.2.tar.gz https://github.com/lecramyajiv/flite-voice-0/archive/1.1/flite-voice-0-1.1.tar.gz https://github.com/lecramyajiv/flite-voice-01/archive/1.1/flite-voice-01-1.1.tar.gz https://github.com/lecramyajiv/flite-voice-02/archive/1.1/flite-voice-02-1.1.tar.gz https://github.com/lecramyajiv/flite-voice-in01/archive/1.0/flite-voice-in01-1.0.tar.gz https://github.com/lecramyajiv/flite-voice-in02/archive/1.0/flite-voice-in02-1.0.tar.gz https://github.com/lecramyajiv/flite-voice-in03/archive/1.0/flite-voice-in03-1.0.tar.gz https://github.com/DanBloomberg/leptonica/archive/1.85.0/leptonica-1.85.0.tar.gz https://storage.googleapis.com/aom-releases/libaom-3.12.1.tar.gz https://github.com/libass/libass/releases/download/0.17.3/libass-0.17.3.tar.xz https://github.com/stoth68000/libklvanc/archive/b409fc2/libklvanc-b409fc2.tar.gz http://downloads.sourceforge.net/modplug-xmms/libmodplug-0.8.9.0.tar.gz https://lib.openmpt.org/files/libopenmpt/src/libopenmpt-0.7.13+release.autotools.tar.gz https://github.com/haasn/libplacebo/archive/v7.351.0/libplacebo-v7.351.0.tar.gz https://code.videolan.org/rist/librist/-/archive/v0.2.11/librist-v0.2.11.tar.gz https://github.com/numactl/numactl/releases/download/v2.0.19/numactl-2.0.19.tar.gz https://github.com/cisco/openh264/archive/v2.6.0/openh264-2.6.0.tar.gz https://github.com/toots/shine/archive/ab5e352/shine-ab5e352.tar.gz https://github.com/google/snappy/archive/1.2.2/snappy-1.2.2.tar.gz https://github.com/uavs3/uavs3d/archive/1fd0491/uavs3d-1fd0491.tar.gz https://code.soundsoftware.ac.uk/attachments/download/2691/vamp-plugin-sdk-2.10.0.tar.gz https://github.com/vapoursynth/vapoursynth/archive/R71/vapoursynth-R71.tar.gz"
+MD5SUM_x86_64="8186452c6d3cfc89cc6c880a6a7130d0 \
+               b1ed4ad76aa58607d6dc31409ca23849 \
+               31f84ece0078906780f07942c0cd978c \
+               15343227756d34002cde0bdef0800717 \
+               6918bb8e654a234f4dbf1c73501ccd7f \
+               9ed9768bfbee8ca7b76009a14fcb50b2 \
+               4eeb535363cae1642a0ca6f280fd5084 \
+               b3e30d93d857864f536eafe48cfdcae7 \
+               61e5ce17e6ae74efa71427b1e79e0b72 \
+               9450017d7c9269cae1fad59b6cd06a3e \
+               51e4e369c41f66d2f8f1ed83e2206908 \
+               baed6dfc87bed705c1955cc6b932d7f6 \
+               13eb0a3139178b31508c63e786ec3865 \
+               5ba16981e6515975e9a68a58d5ba69d1 \
+               8e8ff375a24a8171924af7c5431b9182 \
+               2bd64e3591e4689b29669cd915aa22a4 \
+               9977eca2fd86825b4f7d0c802f6da3ae \
+               06e454dd4df7f5d0b8d6db975305456d \
+               0b01f0279eca1c7bb65395ea350fa85c \
+               1f8ac33d4819acf526b5de4a9a5c1bec \
+               30286dd6311dee1d5498c57f62eda7b8 \
+               347425aec780f5dfee3baa768bca02aa \
+               848f7ac0227b5c783bee0dd7a5cb3642 \
+               670fae58113a287a45bd7735156353e7"
+REQUIRES="ffmpeg-dep-I python3-glad python3-meson-opt python3-setuptools-opt python3-build python3-wheel"
+MAINTAINER="Vijay Marcel"
+EMAIL="vijaymarcel@outlook.com"
