@@ -1,0 +1,877 @@
+#!/bin/bash
+
+# Slackware build script for ffmpeg-dep-II
+
+# Copyright 2025-2026 Vijay Marcel
+# All rights reserved.
+#
+# Redistribution and use of this script, with or without modification, is
+# permitted provided that the following conditions are met:
+#
+# 1. Redistributions of this script must retain the above copyright
+#    notice, this list of conditions and the following disclaimer.
+#
+# 2. Redistributions in binary form must reproduce the above copyright
+#    notice, this list of conditions and the following disclaimer in
+#    the documentation and/or other materials provided with the distribution.
+#
+#  THIS SOFTWARE IS PROVIDED BY THE AUTHOR "AS IS" AND ANY EXPRESS OR IMPLIED
+#  WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+#  MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO
+#  EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+#  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+#  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
+#  OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+#  WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
+#  OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
+#  ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+cd $(dirname $0) ; CWD=$(pwd)
+
+PRGNAM=ffmpeg-dep-II
+VERSION=${VERSION:-1.0}
+BUILD=${BUILD:-5}
+TAG=${TAG:-_SBo}
+PKGTYPE=${PKGTYPE:-tgz}
+nprocr=$(expr $(nproc))
+sys_arch=${sys_arch:-$(uname -m)}
+
+set -e
+trap 'echo "$0 FAILED at line $LINENO!" | tee -a $OUTPUT/error-${PRGNAM}.log' ERR
+
+TMP=${TMP:-/tmp/SBo}
+PKG=$TMP/package-$PRGNAM
+OUTPUT=${OUTPUT:-/tmp}
+DOCDIR=$PKG/usr/doc/$PRGNAM-$VERSION
+
+rm -rf $PKG
+mkdir -p $TMP $PKG $OUTPUT
+mkdir -pv $DOCDIR
+
+case "$sys_arch" in
+   	x86_64) export ARCH=x86_64 ;;
+	     *) echo "This SlackBuild will not run on $sys_arch platform" && exit 1 ;;
+esac
+
+# --Wno-incompatible-pointer-types is valid only for C/objC and not for C++
+if [ "$ARCH" = "x86_64" ]; then
+  LIBDIRSUFFIX="64"
+  ARCHFLAGS="-march=native -m64 -pipe -ffunction-sections -fdata-sections -O2 -fPIC"
+  PFLAGS="-fno-delete-null-pointer-checks -Wno-incompatible-pointer-types"
+  PXXFLAGS="-fno-delete-null-pointer-checks"
+  GCFLAGS="-Wl,-O1 -Wl,--sort-section=name -Wl,--gc-sections"
+  SLKCFLAGS="$ARCHFLAGS $PFLAGS"
+  SLKCXXFLAGS="$ARCHFLAGS $PXXFLAGS"
+  SLDFLAGS="$GCFLAGS"
+else  echo "this slackbuild will work only on $ARCH" && exit 1
+fi
+
+export CC=${CC:-gcc}
+export CXX=${CXX:-g++}
+export CFLAGS="$SLKCFLAGS"
+export CXXFLAGS="$SLKCXXFLAGS"
+export LDFLAGS="$SLDFLAGS"
+
+export m=/opt/meson/bin # meson path
+export r=/opt/rust/bin # rust path
+export rl=/opt/rust/lib64
+
+PYVER=$(python3 -c 'import sys; print("%d.%d" % sys.version_info[:2])')
+export PYTHONPATH=/opt/python$PYVER/site-packages
+export PATH=$m:$r:$PATH
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$rl
+
+# Dependency name
+
+# codec2
+codnam=${codnam:-codec2}
+codver=${codver:-1.2.0}
+#flite
+flnam=${flnam:-flite}
+flver=${flver:-2.2}
+#libklvanc
+vancnam=${vancnam:-libklvanc}
+vancom=${vancom:-b409fc2}
+vancver=${vancver:-b409fc2b0b8051c871f89367a3489f8aa2b6ed37}
+# modplug
+modpnam=${modpnam:-libmodplug}
+modpver=${modpver:-0.8.9.0}
+# libshine
+shinenam=${shinenam:-shine}
+shinever=${shinever:-ab5e352}
+shinecom=${shinecom:-ab5e3526b64af1a2eaa43aa6f441a7312e013519}
+# Snappy
+snanam=${snanam:-snappy}
+snaver=${snaver:-1.2.2}
+# uavs3d
+uavsnam=${uavsnam:-uavs3d}
+uavscom=${uavscom:-0e20d2c291853f196c68922a264bcd8471d75b68}
+uavsver=${uavsver:-0e20d2c}
+# rist
+ristnam=${ristnam:-librist}
+ristver=${ristver:-0.2.11}
+# openmpt
+mptnam=${mptnam:-libopenmpt}
+mptver=${mptver:-0.8.4}
+#libass
+assnam=${assnam:-libass}
+assver=${assver:-0.17.3}
+# vamp-plugin-sdk
+vampnam=${vampnam:-vamp-plugin-sdk}
+vampver=${vampver:-2.10.0}
+# libaom
+aomnam=${aomnam:-aom-debian}
+aomver=${aomver:-3.13.1-2}
+# libplacebo
+placenam=${placenam:-libplacebo}
+placever=${placever:-7.351.0}
+#Vapoursynth
+vsnam=${vsnam:-vapoursynth}
+vsver=${vsver:-R71}
+#openh264
+ophnam=${ophnam:-openh264}
+ophver=${ophver:-2.6.0}
+
+if [ ! -z "${PRINT_PACKAGE_NAME}" ]; then
+  echo "$PRGNAM-$VERSION-$ARCH-$BUILD$TAG.$PKGTYPE"
+  exit 0
+fi
+
+if pkg-config --exists libavcodec 2>/dev/null ; then
+echo "Soxr will bind to existing ffmpeg uninstall ffmpeg first and rebuild it later"
+exit 1
+fi
+
+REQUIRES=( "ffmpeg-dep-I" "vmaf" )
+pkgdir=/var/log/packages
+
+full=()
+empty=()
+for pkg in "${REQUIRES[@]}"; do
+if ! grep -q "$pkg" "$pkgdir"/*; then
+empty+=("$pkg")
+fi
+  if y=$(ls -1 /var/log/packages | grep -w "$pkg"); then
+        full+=("$pkg")
+    fi
+done
+if [ ${#full[@]} -ne 0 ]; then
+echo "The following Required packages are installed:"
+printf '%s\n' "${full[@]}"
+fi
+if [ ${#empty[@]} -ne 0 ]; then
+    echo "The following files are missing:"
+    printf '%s\n' "${empty[@]}"
+    echo "Install the dependencies" && exit 1
+else
+    echo "All dependencies are satisfied."
+fi
+
+DOWNLOAD=( "https://github.com/drowe67/codec2/archive/1.2.0/codec2-1.2.0.tar.gz|$codnam-$codver.tar.gz"
+"https://github.com/festvox/flite/archive/v2.2/flite-2.2.tar.gz|$flnam-$flver.tar.gz"
+"https://github.com/lecramyajiv/flite-voice-0/archive/1.1/flite-voice-0-1.1.tar.gz|flite-voice-0-1.1.tar.gz"
+"https://github.com/lecramyajiv/flite-voice-01/archive/1.1/flite-voice-01-1.1.tar.gz|flite-voice-01-1.1.tar.gz"
+"https://github.com/lecramyajiv/flite-voice-02/archive/1.1/flite-voice-02-1.1.tar.gz|flite-voice-02-1.1.tar.gz"
+"https://github.com/lecramyajiv/flite-voice-in01/archive/1.0/flite-voice-in01-1.0.tar.gz|flite-voice-in01-1.0.tar.gz"
+"https://github.com/lecramyajiv/flite-voice-in02/archive/1.0/flite-voice-in02-1.0.tar.gz|flite-voice-in02-1.0.tar.gz"
+"https://github.com/lecramyajiv/flite-voice-in03/archive/1.0/flite-voice-in03-1.0.tar.gz|flite-voice-in03-1.0.tar.gz"
+"https://github.com/stoth68000/libklvanc/archive/$vancom/libklvanc-$vancver.tar.gz|$vancnam-$vancver.tar.gz"
+"http://downloads.sourceforge.net/modplug-xmms/libmodplug-0.8.9.0.tar.gz|$modpnam-$modpver.tar.gz"
+"https://github.com/toots/shine/archive/$shinever/shine-$shinecom.tar.gz|$shinenam-$shinecom.tar.gz"
+"https://github.com/google/snappy/archive/1.2.2/snappy-1.2.2.tar.gz|$snanam-$snaver.tar.gz"
+"https://github.com/uavs3/uavs3d/archive/$uavsver/uavs3d-$uavscom.tar.gz|$uavsnam-$uavscom.tar.gz"
+"https://code.videolan.org/rist/librist/-/archive/v0.2.11/librist-v0.2.11.tar.gz|$ristnam-v$ristver.tar.gz"
+"https://lib.openmpt.org/files/libopenmpt/src/libopenmpt-0.8.4+release.autotools.tar.gz|$mptnam-$mptver.tar.gz"
+"https://github.com/libass/libass/releases/download/0.17.3/libass-0.17.3.tar.xz|$assnam-$assver.tar.xz"
+"https://github.com/vamp-plugins/$vampnam/releases/download/$vampnam-v2.10/$vampnam-$vampver.tar.gz|$vampnam-$vampver.tar.gz"
+"https://salsa.debian.org/multimedia-team/aom/-/archive/debian/3.13.1-2/aom-debian-3.13.1-2.tar.gz|$aomnam-$aomver.tar.gz"
+"https://github.com/haasn/libplacebo/archive/v7.351.0/libplacebo-v7.351.0.tar.gz|$placenam-$placever.tar.gz"
+"https://github.com/vapoursynth/vapoursynth/archive/R71/vapoursynth-R71.tar.gz|$vsnam-$vsver.tar.gz"
+"https://github.com/cisco/openh264/archive/v2.6.0/openh264-2.6.0.tar.gz|$ophnam-$ophver.tar.gz" )
+
+for entry in "${DOWNLOAD[@]}"; do
+IFS="|" read -r URL FILENAME <<< "$entry"
+if [[ -f "$FILENAME" ]]; then
+      echo "File '$FILENAME' already exists. Skipping download."
+else  echo "The files will be downloaded now"
+      wget -L "$URL" -O "$FILENAME"
+if [ $? -ne 0 ]; then
+        echo "Error: Failed to download $FILENAME"
+        exit 1
+fi
+fi
+done
+
+chksum=("824f5913ebd8f9712473ce0b355e4a0d|aom-debian-3.13.1-2.tar.gz"
+"8186452c6d3cfc89cc6c880a6a7130d0|codec2-1.2.0.tar.gz"
+"31f84ece0078906780f07942c0cd978c|flite-2.2.tar.gz"
+"15343227756d34002cde0bdef0800717|flite-voice-0-1.1.tar.gz"
+"6918bb8e654a234f4dbf1c73501ccd7f|flite-voice-01-1.1.tar.gz"
+"9ed9768bfbee8ca7b76009a14fcb50b2|flite-voice-02-1.1.tar.gz"
+"4eeb535363cae1642a0ca6f280fd5084|flite-voice-in01-1.0.tar.gz"
+"b3e30d93d857864f536eafe48cfdcae7|flite-voice-in02-1.0.tar.gz"
+"61e5ce17e6ae74efa71427b1e79e0b72|flite-voice-in03-1.0.tar.gz"
+"baed6dfc87bed705c1955cc6b932d7f6|libass-0.17.3.tar.xz"
+"13eb0a3139178b31508c63e786ec3865|libklvanc-b409fc2b0b8051c871f89367a3489f8aa2b6ed37.tar.gz"
+"5ba16981e6515975e9a68a58d5ba69d1|libmodplug-0.8.9.0.tar.gz"
+"a3f42cf1d47da78d9ed17e6f6723df32|libopenmpt-0.8.4.tar.gz"
+"2bd64e3591e4689b29669cd915aa22a4|libplacebo-7.351.0.tar.gz"
+"9977eca2fd86825b4f7d0c802f6da3ae|librist-v0.2.11.tar.gz"
+"0b01f0279eca1c7bb65395ea350fa85c|openh264-2.6.0.tar.gz"
+"1f8ac33d4819acf526b5de4a9a5c1bec|shine-ab5e3526b64af1a2eaa43aa6f441a7312e013519.tar.gz"
+"6f9cad922a05e29257ce365444970a7b|uavs3d-0e20d2c291853f196c68922a264bcd8471d75b68.tar.gz"
+"30286dd6311dee1d5498c57f62eda7b8|snappy-1.2.2.tar.gz"
+"848f7ac0227b5c783bee0dd7a5cb3642|vamp-plugin-sdk-2.10.0.tar.gz"
+"670fae58113a287a45bd7735156353e7|vapoursynth-R71.tar.gz"
+)
+
+for entry in "${chksum[@]}"; do
+IFS="|" read -r HASH FILENAME <<< "$entry"
+echo "$HASH  $FILENAME" | md5sum --warn --strict --check --status
+ if [ $? -eq 0 ]; then
+        echo "SUCCESS: $FILENAME matches checksum."
+    else
+        echo "FAILURE: $FILENAME checksum mismatch!"
+        exit 1
+    fi
+done
+
+cd $TMP
+
+# Building vamp-plugin-sdk
+
+rm -rf $vampnam-$vampver
+tar xvf $CWD/$vampnam-$vampver.tar.gz
+cd $vampnam-$vampver
+chown -R root:root .
+find -L . \
+ \( -perm 777 -o -perm 775 -o -perm 750 -o -perm 711 -o -perm 555 \
+  -o -perm 511 \) -exec chmod 755 {} \+ -o \
+ \( -perm 666 -o -perm 664 -o -perm 640 -o -perm 600 -o -perm 444 \
+  -o -perm 440 -o -perm 400 \) -exec chmod 644 {} \+
+
+#From SBo:Fix libdir on x86_64
+sed -i "s|\<lib\>|&$LIBDIRSUFFIX|g" Makefile.in pkgconfig/*.pc.in
+
+CFLAGS="$SLKCFLAGS" \
+CXXFLAGS="$SLKCXXFLAGS" \
+LDFLAGS="$SLDFLAGS" \
+./configure \
+  --prefix=/usr \
+  --bindir=/usr/bin \
+  --libdir=/usr/lib${LIBDIRSUFFIX} \
+  --sysconfdir=/etc \
+  --localstatedir=/var \
+  --mandir=/usr/man \
+  --enable-shared \
+  --enable-programs \
+  --disable-static
+
+make -j$nprocr
+make install DESTDIR=$PKG
+
+rm -f $PKG/usr/lib${LIBDIRSUFFIX}/*.la
+
+mkdir -pv $DOCDIR/$vampnam
+cp -av CHANGELOG COPYING README* $DOCDIR/$vampnam
+
+mkdir -p $PKG/etc/profile.d/
+cat << EOF > $PKG/etc/profile.d/vamp.csh
+#!/bin/csh
+setenv VAMP_PATH /usr/lib${LIBDIRSUFFIX}/vamp
+EOF
+cat << EOF > $PKG/etc/profile.d/vamp.sh
+#!/bin/sh
+export VAMP_PATH=/usr/lib${LIBDIRSUFFIX}/vamp
+EOF
+chmod 0755 $PKG/etc/profile.d/*
+
+cd $TMP
+
+# Building libplacebo
+rm -rf $placenam-$placever
+tar xvf $CWD/$placenam-$placever.tar.gz
+cd $placenam-$placever
+chown -R root:root .
+find -L . \
+ \( -perm 777 -o -perm 775 -o -perm 750 -o -perm 711 -o -perm 555 \
+  -o -perm 511 \) -exec chmod 755 {} \+ -o \
+ \( -perm 666 -o -perm 664 -o -perm 640 -o -perm 600 -o -perm 444 \
+  -o -perm 440 -o -perm 400 \) -exec chmod 644 {} \+
+
+CFLAGS="$SLKCFLAGS" \
+CXXFLAGS="$SLKCXXFLAGS" \
+LDFLAGS="$SLDFLAGS" \
+meson setup build $TMP/$placenam-$placever \
+    --prefix=/usr \
+    --libdir=/usr/lib${LIBDIRSUFFIX} \
+    --localstatedir=/var \
+    --mandir=/usr/man \
+    --sysconfdir=/etc \
+    --buildtype=release \
+    -Dstrip=true \
+    -Dlcms=enabled \
+    -Dopengl=enabled \
+    -Ddemos=false \
+    -Dd3d11=disabled \
+    -Dunwind=disabled \
+    -Dtests=false
+
+ninja -j$nprocr -v -C build
+DESTDIR=$PKG ninja -v -C build install
+
+rm -f $PKG/usr/lib${LIBDIRSUFFIX}/*.la
+
+mkdir -pv $DOCDIR/$placenam-$placever
+cp -av LICENSE README.md $DOCDIR/$placenam-$placever
+
+cd $TMP
+
+# Building flite
+
+rm -rf $flnam-$flver
+tar xvf $CWD/$flnam-$flver.tar.gz
+tar xvf $CWD/flite-voice-0-1.1.tar.gz
+tar xvf $CWD/flite-voice-01-1.1.tar.gz
+tar xvf $CWD/flite-voice-02-1.1.tar.gz
+tar xvf $CWD/flite-voice-in01-1.0.tar.gz
+tar xvf $CWD/flite-voice-in02-1.0.tar.gz
+tar xvf $CWD/flite-voice-in03-1.0.tar.gz
+cd $flnam-$flver
+mkdir -pv fvox
+mv -v $TMP/flite-voice-0-1.1/*.flitevox fvox
+mv -v $TMP/flite-voice-01-1.1/*.flitevox fvox
+mv -v $TMP/flite-voice-02-1.1/*.flitevox fvox
+mv -v $TMP/flite-voice-in01-1.0/*.flitevox fvox
+mv -v $TMP/flite-voice-in02-1.0/*.flitevox fvox
+mv -v $TMP/flite-voice-in03-1.0/*.flitevox fvox
+chown -R root:root .
+find -L . \
+ \( -perm 777 -o -perm 775 -o -perm 750 -o -perm 711 -o -perm 555 \
+  -o -perm 511 \) -exec chmod 755 {} \+ -o \
+ \( -perm 666 -o -perm 664 -o -perm 640 -o -perm 600 -o -perm 444 \
+  -o -perm 440 -o -perm 400 \) -exec chmod 644 {} \+
+
+CFLAGS="$SLKCFLAGS" \
+CXXFLAGS="$SLKCXXFLAGS" \
+LDFLAGS="$SLDFLAGS" \
+./configure \
+  --prefix=/usr \
+  --libdir=/usr/lib${LIBDIRSUFFIX} \
+  --sysconfdir=/etc \
+  --localstatedir=/var \
+  --mandir=/usr/man \
+  --with-audio=alsa \
+  --with-lang \
+  --with-vox \
+  --with-lex \
+  --enable-shared
+
+make -j$nprocr
+make install DESTDIR=$PKG
+
+install -s -m0755 bin/t2p bin/flite_time $PKG/usr/bin
+
+# include any *.flitevox files the user downloaded.
+for file in $TMP/$flnam-$flver/fvox/*.flitevox; do
+  [ -e "$file" ] && \
+    mkdir -p $PKG/usr/share/$flnam && \
+    cat $file > $PKG/usr/share/$flnam/"$( basename "$file" )" && \
+    EXTRA=yes
+done
+
+rm -f $PKG/usr/lib${LIBDIRSUFFIX}/*.la
+
+mkdir -pv $DOCDIR/$flnam-$flver
+cp -av ACKNOWLEDGEMENTS COPYING README* $DOCDIR/$flnam-$flver
+
+cd $TMP
+
+# Building openh264
+
+rm -rf $ophnam-$ophver
+tar xvf $CWD/$ophnam-$ophver.tar.gz
+cd $ophnam-$ophver
+chown -R root:root .
+find -L . \
+ \( -perm 777 -o -perm 775 -o -perm 750 -o -perm 711 -o -perm 555 \
+  -o -perm 511 \) -exec chmod 755 {} \+ -o \
+ \( -perm 666 -o -perm 664 -o -perm 640 -o -perm 600 -o -perm 444 \
+  -o -perm 440 -o -perm 400 \) -exec chmod 644 {} \+
+
+CFLAGS="$SLKCFLAGS" CXXFLAGS="$SLKCXXFLAGS" \
+LDFLAGS="$SLDFLAGS" make -j$nprocr -C $TMP/$ophnam-$ophver OS=linux PREFIX="/usr" \
+    ARCH="$ARCH" LIBDIR_NAME="lib${LIBDIRSUFFIX}" SHAREDLIB_DIR="/usr/lib${LIBDIRSUFFIX}"
+make DESTDIR="$PKG" PREFIX="/usr" LIBDIR_NAME="lib${LIBDIRSUFFIX}" \
+    SHAREDLIB_DIR="/usr/lib${LIBDIRSUFFIX}" install
+
+make OS=linux ARCH=$ARCH
+install -Dvm755 h264dec $PKG/usr/bin/h264dec
+install -Dvm755 h264enc $PKG/usr/bin/h264enc
+
+rm -f $PKG/usr/lib${LIBDIRSUFFIX}/*.la
+
+mkdir -pv $DOCDIR/$ophnam-$ophver
+cp -av LICENSE CONTRIBUTORS RELEASES *.md  $DOCDIR/$ophnam-$ophver
+
+cd $TMP
+
+# Building uavs3d
+
+rm -rf $uavsnam-$uavscom
+tar xvf $CWD/$uavsnam-$uavscom.tar.gz
+cd $uavsnam-$uavscom
+chown -R root:root .
+find -L . \
+ \( -perm 777 -o -perm 775 -o -perm 750 -o -perm 711 -o -perm 555 \
+  -o -perm 511 \) -exec chmod 755 {} \+ -o \
+ \( -perm 666 -o -perm 664 -o -perm 640 -o -perm 600 -o -perm 444 \
+  -o -perm 440 -o -perm 400 \) -exec chmod 644 {} \+
+
+cd source
+patch  --verbose --unified  < $CWD/patches/fix-libdir.patch
+cd ..
+
+mkdir -pv build/linux
+
+cmake -B build/linux -S $TMP/$uavsnam-$uavscom \
+    -DCMAKE_C_FLAGS:STRING="$SLKCFLAGS" \
+    -DCMAKE_CXX_FLAGS:STRING="$SLKCXXFLAGS" \
+    -DCMAKE_C_FLAGS_RELEASE:STRING="$SLKCFLAGS" \
+    -DCMAKE_CXX_FLAGS_RELEASE:STRING="$SLKCXXFLAGS" \
+    -DCMAKE_EXE_LINKER_FLAGS:STRING="$SLDFLAGS" \
+    -DCMAKE_INSTALL_PREFIX:PATH=/usr \
+    -DCMAKE_INSTALL_LIBDIR:PATH=/usr/lib${LIBDIRSUFFIX} \
+    -DCMAKE_INSTALL_BINDIR:PATH=/usr/bin \
+    -DCMAKE_INSTALL_MANDIR:PATH=/usr/man \
+    -DBUILD_SHARED_LIBS=ON \
+    -DCMAKE_BUILD_TYPE:STRING=Release \
+    -DCOMPILE_10BIT=1
+
+cmake --build  build/linux --parallel $nprocr
+DESTDIR=$PKG cmake --install build/linux
+
+install -Dvm 0755 $TMP/$uavsnam-$uavscom/build/linux/uavs3dec -t "$PKG/usr/bin"
+
+rm -f $PKG/usr/lib${LIBDIRSUFFIX}/*.la
+
+mkdir -pv $DOCDIR/$uavsnam
+cp -a COPYING README.md $DOCDIR/$uavsnam
+
+cd $TMP
+
+# Building vapoursynth
+
+rm -rf $vsnam-$vsver
+tar xvf $CWD/$vsnam-$vsver.tar.gz
+cd $vsnam-$vsver
+chown -R root:root .
+find -L . \
+ \( -perm 777 -o -perm 775 -o -perm 750 -o -perm 711 -o -perm 555 \
+  -o -perm 511 \) -exec chmod 755 {} \+ -o \
+ \( -perm 666 -o -perm 664 -o -perm 640 -o -perm 600 -o -perm 444 \
+  -o -perm 440 -o -perm 400 \) -exec chmod 644 {} \+
+
+autoreconf -fi
+sed -z -i "s|PACKAGE_URL='http://www.vapoursynth.com/\n'|PACKAGE_URL='http://www.vapoursynth.com/'|" configure
+
+mkdir -pv $DOCDIR/$vsnam-$vsver
+
+CFLAGS="$SLKCFLAGS" \
+CXXFLAGS="$SLKCXXFLAGS" \
+LDFLAGS="$SLDFLAGS" \
+./configure \
+  --prefix=/usr \
+  --libdir=/usr/lib${LIBDIRSUFFIX} \
+  --sysconfdir=/etc \
+  --localstatedir=/var \
+  --mandir=/usr/man \
+  --docdir=/usr/doc/$PRGNAM-$VERSION/$vsnam-$vsver \
+  --enable-shared \
+  --disable-static
+
+make -j$nprocr
+make install DESTDIR=$PKG
+
+rm -f $PKG/usr/lib${LIBDIRSUFFIX}/*.la
+
+install -D -m0644 $CWD/$vsnam.xml $PKG/usr/share/mime/packages/$vsnam.xml
+
+cp -a COPYING.LESSER ChangeLog README.md $DOCDIR/$vsnam-$vsver
+
+cd $TMP
+
+# Building libshine
+rm -rf $shinenam-$shinecom
+tar xvf $CWD/$shinenam-$shinecom.tar.gz
+cd $shinenam-$shinecom
+chown -R root:root .
+find -L . \
+ \( -perm 777 -o -perm 775 -o -perm 750 -o -perm 711 -o -perm 555 \
+  -o -perm 511 \) -exec chmod 755 {} \+ -o \
+ \( -perm 666 -o -perm 664 -o -perm 640 -o -perm 600 -o -perm 444 \
+  -o -perm 440 -o -perm 400 \) -exec chmod 644 {} \+
+
+mkdir -pv $DOCDIR/$shinenam
+
+./bootstrap
+CFLAGS="$SLKCFLAGS" \
+CXXFLAGS="$SLKCXXFLAGS" \
+LDFLAGS="$SLDFLAGS" \
+./configure \
+  --prefix=/usr \
+  --libdir=/usr/lib${LIBDIRSUFFIX} \
+  --sysconfdir=/etc \
+  --localstatedir=/var \
+  --mandir=/usr/man \
+  --docdir=/usr/doc/$PRGNAM-$VERSION/$shinenam-$shinever \
+  --enable-shared \
+  --disable-static
+
+make -j$nprocr
+make install DESTDIR=$PKG
+
+rm -f $PKG/usr/lib${LIBDIRSUFFIX}/*.la
+
+cp -av README.md COPYING $DOCDIR/$shinenam
+
+cd $TMP
+
+# Building libaom
+
+rm -rf $aomnam-$aomver
+tar xvf $CWD/$aomnam-$aomver.tar.gz
+cd $aomnam-$aomver
+chown -R root:root .
+find -L . \
+ \( -perm 777 -o -perm 775 -o -perm 750 -o -perm 711 -o -perm 555 \
+  -o -perm 511 \) -exec chmod 755 {} \+ -o \
+ \( -perm 666 -o -perm 664 -o -perm 640 -o -perm 600 -o -perm 444 \
+  -o -perm 440 -o -perm 400 \) -exec chmod 644 {} \+
+
+cmake -B build -S $TMP/$aomnam-$aomver \
+    -DCMAKE_C_FLAGS:STRING="$SLKCFLAGS" \
+    -DCMAKE_CXX_FLAGS:STRING="$SLKCXXFLAGS" \
+    -DCMAKE_C_FLAGS_RELEASE:STRING="$SLKCFLAGS" \
+    -DCMAKE_CXX_FLAGS_RELEASE:STRING="$SLKCXXFLAGS" \
+    -DCMAKE_EXE_LINKER_FLAGS:STRING="$SLDFLAGS" \
+    -DCMAKE_INSTALL_PREFIX:PATH=/usr \
+    -DCMAKE_INSTALL_LIBDIR:PATH=/usr/lib${LIBDIRSUFFIX} \
+    -DCMAKE_INSTALL_BINDIR:PATH=/usr/bin \
+    -DCMAKE_INSTALL_MANDIR:PATH=/usr/man \
+    -DCMAKE_BUILD_TYPE:STRING=Release \
+    -DBUILD_SHARED_LIBS=1 \
+    -DCONFIG_MULTITHREAD=1 \
+    -DCONFIG_RUNTIME_CPU_DETECT=1 \
+    -DCONFIG_WEBM_IO=1 \
+    -DCONFIG_LIBYUV=1 \
+    -DCONFIG_TUNE_VMAF=1 \
+    -DENABLE_NASM=1 \
+    -DENABLE_DOCS=0 \
+    -DENABLE_TESTS=0 \
+    -DENABLE_CCACHE=0
+
+cmake --build build --parallel $nprocr
+DESTDIR=$PKG cmake --install build
+
+rm -f $PKG/usr/lib${LIBDIRSUFFIX}/*.la
+
+mkdir -pv $DOCDIR/$aomnam-$aomver
+cp -av LICENSE PATENTS README.md AUTHORS $DOCDIR/$aomnam-$aomver
+
+cd $TMP
+
+# Building libopenmpt
+
+rm -rf $mptnam-$mptver+release.autotools
+tar xvf $CWD/$mptnam-$mptver.tar.gz
+cd $mptnam-$mptver+release.autotools
+chown -R root:root .
+find -L . \
+ \( -perm 777 -o -perm 775 -o -perm 750 -o -perm 711 -o -perm 555 \
+  -o -perm 511 \) -exec chmod 755 {} \+ -o \
+ \( -perm 666 -o -perm 664 -o -perm 640 -o -perm 600 -o -perm 444 \
+  -o -perm 440 -o -perm 400 \) -exec chmod 644 {} \+
+
+mkdir -pv $DOCDIR/$mptnam-$mptver
+
+CFLAGS="$SLKCFLAGS" \
+CXXFLAGS="$SLKCXXFLAGS" \
+LDFLAGS="$SLDFLAGS" \
+./configure \
+  --prefix=/usr \
+  --libdir=/usr/lib${LIBDIRSUFFIX} \
+  --sysconfdir=/etc \
+  --localstatedir=/var \
+  --mandir=/usr/man \
+  --docdir=/usr/doc/$PRGNAM-$VERSION/$mptnam-$mptver \
+  --enable-shared \
+  --enable-openmpt123 \
+  --with-pulseaudio  \
+  --with-vorbisfile \
+  --with-sndfile \
+  --with-mpg123 \
+  --with-flac  \
+  --disable-static \
+  --disable-examples \
+  --disable-tests \
+  --disable-doxygen-doc \
+  --disable-doxygen-html \
+  --disable-doxygen-ps \
+  --disable-doxygen-pdf
+
+make -j$nprocr
+make install DESTDIR=$PKG
+
+rm -f $PKG/usr/lib${LIBDIRSUFFIX}/*.la
+
+cp -av LICENSE README.md $DOCDIR/$mptnam-$mptver
+
+cd $TMP
+
+# Building codec2
+rm -rf $codnam-$codver
+tar xvf $CWD/$codnam-$codver.tar.gz
+cd $codnam-$codver
+chown -R root:root .
+find -L . \
+ \( -perm 777 -o -perm 775 -o -perm 750 -o -perm 711 -o -perm 555 \
+  -o -perm 511 \) -exec chmod 755 {} \+ -o \
+ \( -perm 666 -o -perm 664 -o -perm 640 -o -perm 600 -o -perm 444 \
+  -o -perm 440 -o -perm 400 \) -exec chmod 644 {} \+
+
+cmake -B build -S $TMP/$codnam-$codver \
+    -DCMAKE_C_FLAGS:STRING="$SLKCFLAGS" \
+    -DCMAKE_CXX_FLAGS:STRING="$SLKCXXFLAGS" \
+    -DCMAKE_C_FLAGS_RELEASE:STRING="$SLKCFLAGS" \
+    -DCMAKE_CXX_FLAGS_RELEASE:STRING="$SLKCXXFLAGS" \
+    -DCMAKE_EXE_LINKER_FLAGS:STRING="$SLDFLAGS" \
+    -DCMAKE_INSTALL_PREFIX=/usr \
+    -DCMAKE_INSTALL_BINDIR=/usr/bin \
+    -DLIB_SUFFIX=${LIBDIRSUFFIX} \
+    -DCMAKE_BUILD_TYPE=Release
+
+cmake --build build --parallel $nprocr
+DESTDIR=$PKG cmake --install build
+
+rm -f $PKG/usr/lib${LIBDIRSUFFIX}/*.la
+
+mkdir -pv $DOCDIR/$codnam-$codver
+cp -av COPYING README*.md $DOCDIR/$codnam-$codver
+
+cd $TMP
+
+#Building libass
+
+rm -rf $assnam-$assver
+tar xvf $CWD/$assnam-$assver.tar.xz
+cd $assnam-$assver
+chown -R root:root .
+find -L . \
+ \( -perm 777 -o -perm 775 -o -perm 750 -o -perm 711 -o -perm 555 \
+  -o -perm 511 \) -exec chmod 755 {} \+ -o \
+ \( -perm 666 -o -perm 664 -o -perm 640 -o -perm 600 -o -perm 444 \
+  -o -perm 440 -o -perm 400 \) -exec chmod 644 {} \+
+
+mkdir -pv $DOCDIR/$assnam-$assver
+
+CFLAGS="$SLKCFLAGS" \
+CXXFLAGS="$SLKCXXFLAGS" \
+LDFLAGS="$SLDFLAGS" \
+./configure \
+  --prefix=/usr \
+  --libdir=/usr/lib${LIBDIRSUFFIX} \
+  --sysconfdir=/etc \
+  --localstatedir=/var \
+  --mandir=/usr/man \
+  --docdir=/usr/doc/$PRGNAM-$VERSION/$assnam-$assver \
+  --enable-shared \
+  --enable-compare \
+  --enable-fontconfig \
+  --enable-libunibreak \
+  --with-gnu-ld   \
+  --disable-static \
+  --disable-profile \
+  --disable-fuzz \
+  --disable-coretext \
+  --disable-directwrite
+
+make -j$nprocr
+make install DESTDIR=$PKG
+
+rm -f $PKG/usr/lib${LIBDIRSUFFIX}/*.la
+
+cp -av COPYING README.md MAINTAINERS $DOCDIR/$assnam-$assver
+
+cd $TMP
+
+# Building snappy
+rm -rf $snanam-$snaver
+tar xvf $CWD/$snanam-$snaver.tar.gz
+cd $snanam-$snaver
+chown -R root:root .
+find -L . \
+ \( -perm 777 -o -perm 775 -o -perm 750 -o -perm 711 -o -perm 555 \
+  -o -perm 511 \) -exec chmod 755 {} \+ -o \
+ \( -perm 666 -o -perm 664 -o -perm 640 -o -perm 600 -o -perm 444 \
+  -o -perm 440 -o -perm 400 \) -exec chmod 644 {} \+
+
+cmake -B build -S $TMP/$snanam-$snaver \
+    -DCMAKE_C_FLAGS:STRING="$SLKCFLAGS" \
+    -DCMAKE_CXX_FLAGS:STRING="$SLKCXXFLAGS" \
+    -DCMAKE_C_FLAGS_RELEASE:STRING="$SLKCFLAGS" \
+    -DCMAKE_CXX_FLAGS_RELEASE:STRING="$SLKCXXFLAGS" \
+    -DCMAKE_EXE_LINKER_FLAGS:STRING="$SLDFLAGS" \
+    -DCMAKE_INSTALL_PREFIX:PATH=/usr \
+    -DCMAKE_INSTALL_LIBDIR:PATH=/usr/lib${LIBDIRSUFFIX} \
+    -DCMAKE_INSTALL_BINDIR:PATH=/usr/bin \
+    -DCMAKE_INSTALL_MANDIR:PATH=/usr/man \
+    -DCMAKE_BUILD_TYPE:STRING=Release \
+    -DSNAPPY_BUILD_TESTS=OFF \
+    -DSNAPPY_BUILD_BENCHMARKS=OFF \
+    -DBUILD_SHARED_LIBS=ON
+
+cmake --build build --parallel $nprocr
+DESTDIR=$PKG cmake --install build
+
+rm -f $PKG/usr/lib${LIBDIRSUFFIX}/*.la
+
+mkdir -pv $DOCDIR/$snanam-$snaver
+cp -av AUTHORS COPYING README.md $DOCDIR/$snanam-$snaver
+
+cd $TMP
+
+# Building libmodplug
+rm -rf $modpnam-$modpver
+tar xvf $CWD/$modpnam-$modpver.tar.gz
+cd $modpnam-$modpver
+chown -R root:root .
+find -L . \
+ \( -perm 777 -o -perm 775 -o -perm 750 -o -perm 711 -o -perm 555 \
+  -o -perm 511 \) -exec chmod 755 {} \+ -o \
+ \( -perm 666 -o -perm 664 -o -perm 640 -o -perm 600 -o -perm 444 \
+  -o -perm 440 -o -perm 400 \) -exec chmod 644 {} \+
+
+mkdir -pv $DOCDIR/$modpnam-$modpver
+
+# Fix end-of-line encoding.
+for i in ChangeLog; do
+  sed -e 's/\r//' $i > ${i}.new
+  touch -r $i ${i}.new
+  mv ${i}.new $i
+done
+
+patch -p1 < $CWD/patches/libmodplug-0.8.4-timiditypaths.patch
+
+CFLAGS="$SLKCFLAGS" \
+CXXFLAGS="$SLKCXXFLAGS" \
+LDFLAGS="$SLDFLAGS" \
+./configure \
+  --prefix=/usr \
+  --libdir=/usr/lib${LIBDIRSUFFIX} \
+  --sysconfdir=/etc \
+  --localstatedir=/var \
+  --mandir=/usr/man \
+  --docdir=/usr/doc/$PRGNAM-$VERSION/$modpnam-$modpver \
+  --disable-silent-rules
+
+make -j$nprocr
+make install DESTDIR=$PKG
+
+rm -f $PKG/usr/lib${LIBDIRSUFFIX}/*.la
+
+cp -a AUTHORS ChangeLog COPYING README $DOCDIR/$modpnam-$modpver
+
+cd $TMP
+
+# Building libklvanc
+
+rm -rf $vancnam-$vancver
+tar xvf $CWD/$vancnam-$vancver.tar.gz
+cd $vancnam-$vancver
+chown -R root:root .
+find -L . \
+ \( -perm 777 -o -perm 775 -o -perm 750 -o -perm 711 -o -perm 555 \
+  -o -perm 511 \) -exec chmod 755 {} \+ -o \
+ \( -perm 666 -o -perm 664 -o -perm 640 -o -perm 600 -o -perm 444 \
+  -o -perm 440 -o -perm 400 \) -exec chmod 644 {} \+
+
+mkdir -pv $DOCDIR/$vancnam
+
+./autogen.sh --build
+CFLAGS="$SLKCFLAGS" \
+CXXFLAGS="$SLKCXXFLAGS" \
+LDFLAGS="$SLDFLAGS" \
+./configure \
+  --prefix=/usr \
+  --libdir=/usr/lib${LIBDIRSUFFIX} \
+  --sysconfdir=/etc \
+  --localstatedir=/var \
+  --mandir=/usr/man \
+  --docdir=/usr/doc/$PRGNAM-$VERSION/$vancnam \
+  --with-gnu-ld  \
+  --disable-debug \
+  --disable-static
+
+make -j$nprocr
+make -C $TMP/$vancnam-$vancver DESTDIR=$PKG install
+
+rm -f $PKG/usr/lib${LIBDIRSUFFIX}/*.la
+
+cp -av README.md lgpl-2.1.txt $DOCDIR/$vancnam
+
+cd $TMP
+
+# Building librist
+
+rm -rf $ristnam-v$ristver
+tar xvf $CWD/$ristnam-v$ristver.tar.gz
+cd $ristnam-v$ristver
+chown -R root:root .
+find -L . \
+ \( -perm 777 -o -perm 775 -o -perm 750 -o -perm 711 -o -perm 555 \
+  -o -perm 511 \) -exec chmod 755 {} \+ -o \
+ \( -perm 666 -o -perm 664 -o -perm 640 -o -perm 600 -o -perm 444 \
+  -o -perm 440 -o -perm 400 \) -exec chmod 644 {} \+
+
+CFLAGS="$SLKCFLAGS" CXXFLAGS="$SLKCXXFLAGS" LDFLAGS="$SLDFLAGS" meson setup build $TMP/$ristnam-v$ristver \
+    --prefix=/usr \
+    --libdir=/usr/lib${LIBDIRSUFFIX} \
+    --localstatedir=/var \
+    --mandir=/usr/man \
+    --sysconfdir=/etc \
+    --buildtype=release \
+    -Dstrip=true \
+    -Dtest=false \
+    -Dbuiltin_mbedtls=true \
+    -Dbuiltin_cjson=true \
+    -Dallow_obj_filter=true
+
+ninja -j$nprocr -v -C build
+DESTDIR=$PKG ninja -v -C build install
+
+rm -f $PKG/usr/lib${LIBDIRSUFFIX}/*.la
+
+mkdir -pv $DOCDIR/$ristnam-$ristver
+cp -a COPYING NEWS README.md THANKS.md  $DOCDIR/$ristnam-$ristver
+
+cd $TMP
+
+find $PKG -print0 | xargs -0 file | grep -e "executable" -e "shared object" | grep ELF \
+  | cut -f 1 -d : | xargs strip --strip-unneeded --remove-section=.comment --remove-section=.note 2> /dev/null || true
+
+find $PKG/usr/man -type f -exec gzip -9 {} \;
+for i in $( find $PKG/usr/man -type l ) ; do ln -s $( readlink $i ).gz $i.gz ; rm $i ; done
+
+cat $CWD/$PRGNAM.SlackBuild > $DOCDIR/$PRGNAM.SlackBuild
+find $PKG/usr/lib${LIBDIRSUFFIX} -type f -exec chmod 0755 {} \+
+find $PKG/usr/include/librist -type f -name '*.h' -exec chmod -v 0644 {} \+
+find $PKG/usr/lib${LIBDIRSUFFIX} -type f -name '*.a' -exec chmod -v 0644 {} \+
+find $PKG/usr/lib${LIBDIRSUFFIX} -type f -name '*.a' -exec strip --verbose -g "{}" \+
+find $DOCDIR -type f -exec chmod 0644 {} \+
+
+mkdir -pv $PKG/install
+cat $CWD/slack-desc > $PKG/install/slack-desc
+
+cd $PKG
+/sbin/makepkg -l y -c n --remove-rpaths --remove-tmp-rpaths $OUTPUT/$PRGNAM-$VERSION-$ARCH-$BUILD$TAG.$PKGTYPE

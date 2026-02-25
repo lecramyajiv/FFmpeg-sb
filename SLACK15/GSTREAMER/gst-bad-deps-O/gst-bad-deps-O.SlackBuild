@@ -1,0 +1,447 @@
+#!/bin/bash
+
+# Slackware build script for gst-bad-deps-O
+
+# Copyright 2025-2026 Vijay Marcel
+# All rights reserved.
+#
+# Redistribution and use of this script, with or without modification, is
+# permitted provided that the following conditions are met:
+#
+# 1. Redistributions of this script must retain the above copyright
+#    notice, this list of conditions and the following disclaimer.
+#
+# 2. Redistributions in binary form must reproduce the above copyright
+#    notice, this list of conditions and the following disclaimer in
+#    the documentation and/or other materials provided with the distribution.
+#
+#  THIS SOFTWARE IS PROVIDED BY THE AUTHOR "AS IS" AND ANY EXPRESS OR IMPLIED
+#  WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+#  MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO
+#  EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+#  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+#  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
+#  OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+#  WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
+#  OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
+#  ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+cd $(dirname $0) ; CWD=$(pwd)
+
+PRGNAM=gst-bad-deps-O
+VERSION=${VERSION:-1.0}
+BUILD=${BUILD:-1}
+TAG=${TAG:-_SBo}
+PKGTYPE=${PKGTYPE:-tgz}
+nprocr=$(expr $(nproc))
+sys_arch=${sys_arch:-$(uname -m)}
+
+set -e
+trap 'echo "$0 FAILED at line $LINENO!" | tee -a $OUTPUT/error-${PRGNAM}.log' ERR
+
+TMP=${TMP:-/tmp/SBo}
+PKG=$TMP/package-$PRGNAM
+OUTPUT=${OUTPUT:-/tmp}
+DOCDIR=$PKG/usr/doc/$PRGNAM-$VERSION
+
+rm -rf $PKG
+mkdir -pv $TMP $PKG $OUTPUT
+mkdir -pv $DOCDIR
+
+case "$sys_arch" in
+   	x86_64) export ARCH=x86_64 ;;
+	     *) echo "This SlackBuild will not run on $sys_arch platform" && exit 1 ;;
+esac
+
+if [ "$ARCH" = "x86_64" ]; then
+  LIBDIRSUFFIX="64"
+  ARCHFLAGS="-march=native -m64 -pipe -ffunction-sections -fdata-sections -O2 -fPIC"
+  PFLAGS="-fno-delete-null-pointer-checks -Wno-incompatible-pointer-types"
+  PXXFLAGS="-fno-delete-null-pointer-checks"
+  GCFLAGS="-Wl,-O1 -Wl,--sort-section=name -Wl,--gc-sections"
+  SLKCFLAGS="$ARCHFLAGS $PFLAGS"
+  SLKCXXFLAGS="$ARCHFLAGS $PXXFLAGS"
+  SLDFLAGS="$GCFLAGS"
+else 
+echo "this slackbuild will work only on $ARCH" && exit 1
+fi
+
+export CC=${CC:-gcc}
+export CXX=${CXX:-g++}
+export CFLAGS="$SLKCFLAGS"
+export CXXFLAGS="$SLKCXXFLAGS"
+export LDFLAGS="$SLDFLAGS"
+
+export m=/opt/meson/bin # meson path
+export r=/opt/rust/bin # rust path
+export rl=/opt/rust/lib64
+
+PYVER=$(python3 -c 'import sys; print("%d.%d" % sys.version_info[:2])')
+export PYTHONPATH=/opt/python$PYVER/site-packages
+export PATH=$m:$r:$PATH
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$rl
+
+# Dependency name
+
+# libcuefile
+cuenam=${cuenam:-libcuefile}
+cuever=${cuever:-r475}
+
+# libreplay gain
+
+repgnam=${repgnam:-libreplaygain}
+repgver=${repgver:-r475}
+
+# abseil-cpp
+
+abscnam=${abscnam:-abseil-cpp}
+abscver=${abscver:-20250512.0}
+
+# libshout
+
+shoutnam=${shoutnam:-libshout}
+shoutver=${shoutver:-2.4.6}
+
+# Goom
+
+goomnam=${goomnam:-goom}
+goomver=${goomver:-2k4-0-src}
+
+#libebml
+
+ebmlnam=libebml
+ebmlver=1.4.5
+
+if [ ! -z "${PRINT_PACKAGE_NAME}" ]; then
+  echo "$PRGNAM-$VERSION-$ARCH-$BUILD$TAG.$PKGTYPE"
+  exit 0
+fi
+
+REQUIRES=( "ffmpeg" )
+pkgdir=/var/log/packages
+
+full=()
+empty=()
+for pkg in "${REQUIRES[@]}"; do
+if ! grep -q "$pkg" "$pkgdir"/*; then
+empty+=("$pkg")
+fi
+  if y=$(ls -1 /var/log/packages | grep -w "$pkg"); then
+        full+=("$pkg")
+    fi
+done
+if [ ${#full[@]} -ne 0 ]; then
+echo "The following Required packages are installed:"
+printf '%s\n' "${full[@]}"
+fi
+if [ ${#empty[@]} -ne 0 ]; then
+    echo "The following files are missing:"
+    printf '%s\n' "${empty[@]}"
+    echo "Install the dependencies" && exit 1
+else
+    echo "All dependencies are satisfied."
+fi
+
+DOWNLOAD=( "http://files.musepack.net/source/libcuefile_r475.tar.gz|${cuenam}_${cuever}.tar.gz"
+"http://files.musepack.net/source/libreplaygain_r475.tar.gz|${repgnam}_${repgver}.tar.gz"
+"https://github.com/abseil/abseil-cpp/archive/20250512.0/abseil-cpp-20250512.0.tar.gz|$abscnam-$abscver.tar.gz"
+"https://downloads.xiph.org/releases/libshout/libshout-2.4.6.tar.gz|$shoutnam-$shoutver.tar.gz"
+"https://downloads.sourceforge.net/sourceforge/goom/goom2k4/0/goom-2k4-0-src.tar.gz|$goomnam-$goomver.tar.gz"
+"http://dl.matroska.org/downloads/libebml/libebml-1.4.5.tar.xz|$ebmlnam-$ebmlver.tar.xz" )
+
+for entry in "${DOWNLOAD[@]}"; do
+# Parse URL and FILENAME safely
+IFS='|' read -r URL FILENAME <<< "$entry"
+# Validate entry format
+if [[ -z "$URL" || -z "$FILENAME" ]]; then
+        echo "Invalid entry: '$entry' (expected URL|FILENAME)"
+        continue
+fi
+# Check if file already exists and is non-empty
+if [[ -s "$FILENAME" ]]; then
+        echo "File '$FILENAME' already exists. Skipping download."
+        continue
+fi
+echo "Downloading '$FILENAME'..."
+# Attempt download
+if wget -L "$URL" -O "$FILENAME"; then
+        # Verify file is not empty
+if [[ ! -s "$FILENAME" ]]; then
+            echo "Error: Downloaded file '$FILENAME' is empty."
+            rm -f "$FILENAME"
+else
+            echo "Downloaded '$FILENAME' successfully."
+fi
+else
+echo "Error: Failed to download '$FILENAME'"
+rm -f "$FILENAME"
+continue
+fi
+done
+
+chksum=("ecd64c3c38b20335c48e1ede28a8db90|abseil-cpp-20250512.0.tar.gz"
+"8100dd07e0c6784fdf079eeaa53a5c7f|goom-2k4-0-src.tar.gz"
+"1a6ac52e1080fd54f0f59372345f1e4e|libcuefile_r475.tar.gz"
+"e27b3b1249b7fbae92d656d9e3d26633|libreplaygain_r475.tar.gz"
+"4a66a369a01ce790e578221fa2c8ea60|libshout-2.4.6.tar.gz"
+"2b6c3c60e0eb54f0156561052ebfba2f|libebml-1.4.5.tar.xz"
+)
+
+for entry in "${chksum[@]}"; do
+IFS="|" read -r HASH FILENAME <<< "$entry"
+echo "$HASH  $FILENAME" | md5sum --warn --strict --check --status
+ if [ $? -eq 0 ]; then
+        echo "SUCCESS: $FILENAME matches checksum."
+    else
+        echo "FAILURE: $FILENAME checksum mismatch!"
+        exit 1
+    fi
+done
+
+cd $TMP
+
+# Building libebml
+
+rm -rf $ebmlnam-$ebmlver
+tar xvf $CWD/$ebmlnam-$ebmlver.tar.xz
+cd $ebmlnam-$ebmlver
+chown -R root:root .
+find -L . \
+ \( -perm 777 -o -perm 775 -o -perm 750 -o -perm 711 -o -perm 555 \
+  -o -perm 511 \) -exec chmod 755 {} \+ -o \
+ \( -perm 666 -o -perm 664 -o -perm 640 -o -perm 600 -o -perm 444 \
+  -o -perm 440 -o -perm 400 \) -exec chmod 644 {} \+
+
+# patches from vlc version 3.0.23
+patch -p1 --unified --verbose < $CWD/patches/0001-EbmlString-ReadFully-use-automatic-memory-management.patch
+patch -p1 --unified --verbose < $CWD/patches/0001-EbmlMaster-fix-leak-when-reading-upper-level-element.patch
+patch -p1 --unified --verbose < $CWD/patches/0002-EbmlUnicodeString-use-std-string-when-reading-instea.patch
+
+cmake -B build -S $TMP/$ebmlnam-$ebmlver \
+    -DCMAKE_C_FLAGS:STRING="$SLKCFLAGS" \
+    -DCMAKE_CXX_FLAGS:STRING="$SLKCXXFLAGS" \
+    -DCMAKE_C_FLAGS_RELEASE:STRING="$SLKCFLAGS" \
+    -DCMAKE_CXX_FLAGS_RELEASE:STRING="$SLKCXXFLAGS" \
+    -DCMAKE_EXE_LINKER_FLAGS:STRING="$SLDFLAGS" \
+    -DCMAKE_INSTALL_PREFIX:PATH=/usr \
+    -DLIB_SUFFIX=${LIBDIRSUFFIX} \
+    -DBUILD_SHARED_LIBS=ON \
+    -DCMAKE_BUILD_TYPE=Release
+
+cmake --build build --parallel $nprocr
+DESTDIR=$PKG cmake --install build
+
+mkdir -pv $DOCDIR/$ebmlnam-$ebmlver
+cp -av README.md LICENSE.LGPL $DOCDIR/$ebmlnam-$ebmlver
+
+cd $TMP
+
+# Building goom
+
+rm -rf $goomnam-$goomver
+tar xvf $CWD/$goomnam-$goomver.tar.gz
+mv -v ${goomnam}2k4-0 $goomnam
+cd $goomnam
+chown -R root:root .
+find -L . \
+ \( -perm 777 -o -perm 775 -o -perm 750 -o -perm 711 -o -perm 555 \
+  -o -perm 511 \) -exec chmod 755 {} \+ -o \
+ \( -perm 666 -o -perm 664 -o -perm 640 -o -perm 600 -o -perm 444 \
+  -o -perm 440 -o -perm 400 \) -exec chmod 644 {} \+
+
+
+# patches from vlc version 3.0.23
+patch -p1 --unified < $CWD/patches/goom-memleaks.patch
+
+mkdir -pv $DOCDIR/$goomnam-$goomver
+
+CFLAGS="$SLKCFLAGS" \
+CXXFLAGS="$SLKCXXFLAGS" \
+LDFLAGS="$SLDFLAGS" \
+./configure \
+  --prefix=/usr \
+  --bindir=/usr/bin \
+  --libdir=/usr/lib${LIBDIRSUFFIX} \
+  --sysconfdir=/etc \
+  --localstatedir=/var \
+  --mandir=/usr/man \
+  --build=$ARCH-slackware-linux \
+  --with-xmms-prefix=/usr \
+  --with-sdl-prefix=/usr \
+  --enable-shared \
+  --with-gnu-ld \
+  --disable-sdltest
+
+make -j$nprocr
+make install DESTDIR=$PKG
+
+rm -f $PKG/usr/lib${LIBDIRSUFFIX}/*.la
+rm -f $PKG/usr/lib$LIBDIRSUFFIX/xmms/Visualization/libxmmsgoom2.la
+
+cp -av AUTHORS COPYING ChangeLog README $DOCDIR/$goomnam-$goomver
+
+cd $TMP
+
+# Building libshout
+
+rm -rf $shoutnam-$shoutver
+tar xvf $CWD/$shoutnam-$shoutver.tar.gz
+cd $shoutnam-$shoutver
+chown -R root:root .
+find -L . \
+ \( -perm 777 -o -perm 775 -o -perm 750 -o -perm 711 -o -perm 555 \
+  -o -perm 511 \) -exec chmod 755 {} \+ -o \
+ \( -perm 666 -o -perm 664 -o -perm 640 -o -perm 600 -o -perm 444 \
+  -o -perm 440 -o -perm 400 \) -exec chmod 644 {} \+
+
+mkdir -pv $DOCDIR/$shoutnam-$shoutver
+
+CFLAGS="$SLKCFLAGS" \
+CXXFLAGS="$SLKCXXFLAGS" \
+LDFLAGS="$SLDFLAGS" \
+./configure \
+  --prefix=/usr \
+  --libdir=/usr/lib${LIBDIRSUFFIX} \
+  --includedir=/usr/include \
+  --sysconfdir=/etc \
+  --localstatedir=/var \
+  --mandir=/usr/man \
+  --docdir=/usr/doc/$PRGNAM-$VERSION/$shoutnam-$shoutver \
+  --enable-shared \
+  --enable-tools \
+  --enable-thread \
+  --enable-vorbis \
+  --enable-theora \
+  --enable-speex \
+  --enable-pkgconfig \
+  --with-ogg \
+  --with-openssl \
+  --with-gnu-ld \
+  --disable-examples
+
+make -j$nprocr
+make install DESTDIR=$PKG
+
+rm -f $PKG/usr/lib${LIBDIRSUFFIX}/*.la
+
+cp -av doc/libshout.xml COPYING $DOCDIR/$shoutnam-$shoutver
+
+cd $TMP
+
+# Building libreplaygain
+
+rm -rf ${repgnam}_${repgver}
+tar xvf $CWD/${repgnam}_${repgver}.tar.gz
+cd ${repgnam}_${repgver}
+chown -R root:root .
+find -L . \
+ \( -perm 777 -o -perm 775 -o -perm 750 -o -perm 711 -o -perm 555 \
+  -o -perm 511 \) -exec chmod 755 {} \+ -o \
+ \( -perm 666 -o -perm 664 -o -perm 640 -o -perm 600 -o -perm 444 \
+  -o -perm 440 -o -perm 400 \) -exec chmod 644 {} \+
+
+# From SBo: adding missing include file to CMakeLists.txt
+echo 'INSTALL(FILES ${libreplaygain_SOURCE_DIR}/include/replaygain/gain_analysis.h DESTINATION include/replaygain)' >> src/CMakeLists.txt
+
+cmake -B build -S $TMP/${repgnam}_${repgver} -G "Unix Makefiles" \
+    -DCMAKE_C_FLAGS:STRING="$SLKCFLAGS" \
+    -DCMAKE_CXX_FLAGS:STRING="$SLKCXXFLAGS" \
+    -DCMAKE_C_FLAGS_RELEASE:STRING="$SLKCFLAGS" \
+    -DCMAKE_CXX_FLAGS_RELEASE:STRING="$SLKCXXFLAGS" \
+    -DCMAKE_EXE_LINKER_FLAGS:STRING="$SLDFLAGS" \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_INSTALL_PREFIX=/usr \
+    -DLIB_SUFFIX=${LIBDIRSUFFIX}
+
+cmake --build build --parallel $nprocr
+DESTDIR=$PKG cmake --install build
+
+rm -f $PKG/usr/lib${LIBDIRSUFFIX}/*.la
+
+cd $TMP
+
+# Building libcuefile
+
+rm -rf ${cuenam}_${cuever}
+tar xvf $CWD/${cuenam}_${cuever}.tar.gz
+cd ${cuenam}_${cuever}
+chown -R root:root .
+find -L . \
+ \( -perm 777 -o -perm 775 -o -perm 750 -o -perm 711 -o -perm 555 \
+  -o -perm 511 \) -exec chmod 755 {} \+ -o \
+ \( -perm 666 -o -perm 664 -o -perm 640 -o -perm 600 -o -perm 444 \
+  -o -perm 440 -o -perm 400 \) -exec chmod 644 {} \+
+
+mkdir -pv $DOCDIR/$cuenam-$cuever
+
+# From SBo: adding missing include files to CMakeLists.txt
+echo 'INSTALL(FILES ${libcuefile_SOURCE_DIR}/include/cuetools/cuefile.h ${libcuefile_SOURCE_DIR}/include/cuetools/cd.h ${libcuefile_SOURCE_DIR}/include/cuetools/cdtext.h DESTINATION include/cuetools)' >> src/CMakeLists.txt
+
+cmake -B build -S $TMP/${cuenam}_${cuever} -G "Unix Makefiles" \
+    -DCMAKE_C_FLAGS:STRING="$SLKCFLAGS" \
+    -DCMAKE_CXX_FLAGS:STRING="$SLKCXXFLAGS" \
+    -DCMAKE_C_FLAGS_RELEASE:STRING="$SLKCFLAGS" \
+    -DCMAKE_CXX_FLAGS_RELEASE:STRING="$SLKCXXFLAGS" \
+    -DCMAKE_EXE_LINKER_FLAGS:STRING="$SLDFLAGS" \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_INSTALL_PREFIX=/usr \
+    -DLIB_SUFFIX=${LIBDIRSUFFIX}
+
+cmake --build build --parallel $nprocr
+DESTDIR=$PKG cmake --install build
+
+rm -f $PKG/usr/lib${LIBDIRSUFFIX}/*.la
+
+cp -av AUTHORS COPYING README $DOCDIR/$cuenam-$cuever
+
+cd $TMP
+
+# abseil-cpp
+
+rm -rf $abscnam-$abscver
+tar xvf $CWD/$abscnam-$abscver.tar.gz
+cd $abscnam-$abscver
+chown -R root:root .
+find -L . \
+ \( -perm 777 -o -perm 775 -o -perm 750 -o -perm 711 -o -perm 555 \
+  -o -perm 511 \) -exec chmod 755 {} \+ -o \
+ \( -perm 666 -o -perm 664 -o -perm 640 -o -perm 600 -o -perm 444 \
+  -o -perm 440 -o -perm 400 \) -exec chmod 644 {} \+
+
+mkdir -pv $DOCDIR/$abscnam-$abscver
+
+cmake -B build -S $TMP/$abscnam-$abscver \
+    -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+    -DCMAKE_CXX_FLAGS:STRING="-march=x86-64 -mtune=generic -pipe -O2 -fPIC -DNDEBUG" \
+    -DCMAKE_INSTALL_PREFIX=/usr \
+    -DCMAKE_CXX_STANDARD=17 \
+    -DBUILD_SHARED_LIBS=ON \
+    -DCMAKE_BUILD_TYPE=Release
+
+cmake --build build --parallel $nprocr
+DESTDIR=$PKG cmake --install build
+
+rm -f $PKG/usr/lib${LIBDIRSUFFIX}/*.la
+
+cp -av AUTHORS LICENSE README.md $DOCDIR/$abscnam-$abscver
+
+cd $TMP
+
+find $PKG -print0 | xargs -0 file | grep -e "executable" -e "shared object" | grep ELF \
+  | cut -f 1 -d : | xargs strip --strip-unneeded --remove-section=.comment --remove-section=.note 2> /dev/null || true
+
+find $PKG/usr/man -type f -exec gzip -9 {} \;
+for i in $( find $PKG/usr/man -type l ) ; do ln -s $( readlink $i ).gz $i.gz ; rm $i ; done
+
+rm -rvf $PKG/usr/share/doc
+
+find $PKG/usr/lib${LIBDIRSUFFIX} -type f -exec chmod 0755 {} \+
+find $PKG/usr/lib${LIBDIRSUFFIX} -name "*.a"  -type f -exec chmod 0644 {} \+
+cat $CWD/$PRGNAM.SlackBuild > $DOCDIR/$PRGNAM.SlackBuild
+find $DOCDIR -type f -exec chmod 0644 {} \+
+
+mkdir -p $PKG/install
+cat $CWD/slack-desc > $PKG/install/slack-desc
+
+cd $PKG
+/sbin/makepkg -l y -c n --remove-rpaths --remove-tmp-rpaths $OUTPUT/$PRGNAM-$VERSION-$ARCH-$BUILD$TAG.$PKGTYPE

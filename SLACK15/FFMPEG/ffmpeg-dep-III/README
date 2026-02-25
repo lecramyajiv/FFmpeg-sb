@@ -1,0 +1,19 @@
+Collection of ffmpeg dependencies
+
+X264 is built without support for 
+libavformat or gpac as this becomes 
+a circular dependency.
+
+This contains the following dependencies:
+1. libvpl
+2. Tesseract
+3. svt-av1
+4. rubberband
+5. kvazaar
+6. x265
+
+The following uses git clone to download the
+sources.
+1. x264
+2. LCEVCdec
+3. Rtmpdump

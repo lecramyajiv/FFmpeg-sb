@@ -1,0 +1,80 @@
+# vsxu
+# Building from personal repo instead of archived repo
+vsxnam=vsxu
+vsxver=0.6.3.0
+lzhaurl=${lzhamurl:-https://github.com/vovoid/lzham_codec.git}
+
+# Cal3D
+calnam=Cal3D
+calver=0.120
+
+# lodepng
+lodenam=lodepng
+lodeurl=${lodeurl:-https://github.com/lvandeve/lodepng.git}
+
+"https://github.com/mp3butcher/Cal3D/archive/0.120/Cal3D-0.120.tar.gz|$calnam-$calver.tar.gz"
+"8d914c71119a0a988a582c4bc6a24b53|Cal3D-0.120.tar.gz"
+
+# Building lodepng
+git clone --depth=1 $lodeurl
+cd $lodenam
+chown -R root:root .
+find -L . \
+ \( -perm 777 -o -perm 775 -o -perm 750 -o -perm 711 -o -perm 555 \
+  -o -perm 511 \) -exec chmod 755 {} \+ -o \
+ \( -perm 666 -o -perm 664 -o -perm 640 -o -perm 600 -o -perm 444 \
+  -o -perm 440 -o -perm 400 \) -exec chmod 644 {} \+
+
+mkdir -pv $PKG/usr/bin
+mkdir -pv $PKG/usr/include
+CXXFLAGS="$SLKCXXFLAGS" LDFLAGS="$SLDFLAGS" make -j$nprocr showpng
+CXXFLAGS="$SLKCXXFLAGS" LDFLAGS="$SLDFLAGS" make -j$nprocr pngdetail
+install -Dvm 0755 showpng -t $PKG/usr/bin
+install -Dvm 0755 pngdetail -t $PKG/usr/bin
+install -Dvm 0644 lodepng.h -t $PKG/usr/include
+
+mkdir -pv $DOCDIR/$lodenam
+cp -av LICENSE README.md $DOCDIR/$lodenam
+
+cd $TMP
+
+# Building cal3D
+
+rm -rf $calnam-$calver
+tar xvf $CWD/$calnam-$calver.tar.gz
+cd $calnam-$calver
+chown -R root:root .
+find -L . \
+ \( -perm 777 -o -perm 775 -o -perm 750 -o -perm 711 -o -perm 555 \
+  -o -perm 511 \) -exec chmod 755 {} \+ -o \
+ \( -perm 666 -o -perm 664 -o -perm 640 -o -perm 600 -o -perm 444 \
+  -o -perm 440 -o -perm 400 \) -exec chmod 644 {} \+
+
+patch -p1 < $CWD/patches/cal3d-0.120.patch
+cd cal3d
+
+sed -i 's/AM_USE_UNITTESTCPP/#\ AM_USE_UNITTESTCPP/' configure.in
+
+autoreconf -fiv
+
+CFLAGS="$SLKCFLAGS" \
+CXXFLAGS="$SLKCXXFLAGS" \
+LDFLAGS="$SLDFLAGS" \
+./configure \
+  --prefix=/usr \
+  --includedir=/usr/include \
+  --sysconfdir=/etc \
+  --libdir=/usr/lib${LIBDIRSUFFIX} \
+  --localstatedir=/var \
+  --mandir=/usr/man \
+  --infodir=/usr/info \
+  --enable-shared
+
+make -j$nprocr
+make install DESTDIR=$PKG
+
+mkdir -pv $DOCDIR/$calnam-$calver
+cp -av AUTHORS COPYING README $DOCDIR/$calnam-$calver
+cd ..
+
+cd $TMP

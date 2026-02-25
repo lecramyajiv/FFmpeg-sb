@@ -1,0 +1,19 @@
+# HOW TO EDIT THIS FILE:
+# The "handy ruler" below makes it easier to edit a package description.
+# Line up the first '|' above the ':' following the base package name, and
+# the '|' on the right side marks the last column you can put a character in.
+# You must make exactly 11 lines for the formatting to be correct.  It's also
+# customary to leave one space after the ':' except on otherwise blank lines.
+
+              |-----handy-ruler------------------------------------------------------|
+gst-bad-deps-I: gst-bad-deps (Gst bad plugins deps)
+gst-bad-deps-I:
+gst-bad-deps-I: Dependencies for the gstreamer bad plugins.It contains the
+gst-bad-deps-I: following dependencies.libavtp,libmatroska,libcaption,libmicrodns,
+gst-bad-deps-I: mbedtls,libdca,faac,faad,libde265,libsrtp,libmms,libkate,libdvbcsa,
+gst-bad-deps-I: libdvbpsi,libdv,SDL_gfx,schroedinger,spandsp,raptor2 and
+gst-bad-deps-I: tinyalsa.
+gst-bad-deps-I:
+gst-bad-deps-I:
+gst-bad-deps-I: Homepage:https://gstreamer.freedesktop.org/
+gst-bad-deps-I:

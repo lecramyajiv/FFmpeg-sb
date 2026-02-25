@@ -1,0 +1,57 @@
+# need lesser version of vmaf for ffmpeg4.4.6
+
+#vmaf
+vmafnam=${vmafnam:-vmaf}
+vmafver=${vmafver:-3.0.0}
+vmafcommit=${vmafcommit:-6b75f37728b2eb70c11508ece93afaacc6572b45}
+
+# Building vmaf
+
+rm -rf $vmafnam-$vmafcommit
+tar xvf $CWD/$vmafnam-$vmafcommit.tar.gz
+cd $vmafnam-$vmafcommit
+chown -R root:root .
+find -L . \
+ \( -perm 777 -o -perm 775 -o -perm 750 -o -perm 711 -o -perm 555 \
+  -o -perm 511 \) -exec chmod 755 {} \+ -o \
+ \( -perm 666 -o -perm 664 -o -perm 640 -o -perm 600 -o -perm 444 \
+  -o -perm 440 -o -perm 400 \) -exec chmod 644 {} \+
+
+CFLAGS="$SLKCFLAGS" CXXFLAGS="$SLKCXXFLAGS" LDFLAGS="$SLDFLAGS" meson setup build libvmaf \
+    -Dprefix=/usr \
+    -Dlibdir=/usr/lib${LIBDIRSUFFIX} \
+    -Dlocalstatedir=/var \
+    -Dmandir=/usr/man \
+    -Dsysconfdir=/etc \
+    -Denable_float=true \
+    -Dbuildtype=release \
+    -Dstrip=true
+
+ninja -j$nprocr -v -C build
+DESTDIR=$PKG ninja -v -C build install
+
+rm -f $PKG/usr/lib${LIBDIRSUFFIX}/*.la
+
+# copy the models that compiled during our build
+# vmaf now use .json based model files.
+mkdir -pv $PKG/usr/share/$vmafnam-$vmafver/model
+
+cp -dr --no-preserve='ownership' $TMP/$vmafnam-$vmafcommit/build/src/vmaf_4k_v0.6.1.json "$PKG/usr/share/$vmafnam-$vmafver/model"
+cp -dr --no-preserve='ownership' $TMP/$vmafnam-$vmafcommit/build/src/vmaf_4k_v0.6.1neg.json "$PKG/usr/share/$vmafnam-$vmafver/model"
+cp -dr --no-preserve='ownership' $TMP/$vmafnam-$vmafcommit/build/src/vmaf_b_v0.6.3.json "$PKG/usr/share/$vmafnam-$vmafver/model"
+cp -dr --no-preserve='ownership' $TMP/$vmafnam-$vmafcommit/build/src/vmaf_float_4k_v0.6.1.json "$PKG/usr/share/$vmafnam-$vmafver/model"
+cp -dr --no-preserve='ownership' $TMP/$vmafnam-$vmafcommit/build/src/vmaf_float_b_v0.6.3.json "$PKG/usr/share/$vmafnam-$vmafver/model"
+cp -dr --no-preserve='ownership' $TMP/$vmafnam-$vmafcommit/build/src/vmaf_float_v0.6.1.json "$PKG/usr/share/$vmafnam-$vmafver/model"
+cp -dr --no-preserve='ownership' $TMP/$vmafnam-$vmafcommit/build/src/vmaf_float_v0.6.1neg.json "$PKG/usr/share/$vmafnam-$vmafver/model"
+cp -dr --no-preserve='ownership' $TMP/$vmafnam-$vmafcommit/build/src/vmaf_v0.6.1.json "$PKG/usr/share/$vmafnam-$vmafver/model"
+cp -dr --no-preserve='ownership' $TMP/$vmafnam-$vmafcommit/build/src/vmaf_v0.6.1neg.json  "$PKG/usr/share/$vmafnam-$vmafver/model"
+
+find $TMP/$vmafnam-$vmafcommit/model/other_models -name '*.json' -type f -exec install -Dvm 0644 {} -t "$PKG/usr/share/$vmafnam-$vmafver/model" \;
+find $TMP/$vmafnam-$vmafcommit/model/vmaf_4k_rb_v0.6.2 -name '*.json' -type f -exec install -Dvm 0644 {} -t "$PKG/usr/share/$vmafnam-$vmafver/model" \;
+find $TMP/$vmafnam-$vmafcommit/model/vmaf_rb_v0.6.2 -name '*.json' -type f -exec install -Dvm 0644 {} -t "$PKG/usr/share/$vmafnam-$vmafver/model" \;
+find $TMP/$vmafnam-$vmafcommit/model/vmaf_rb_v0.6.3 -name '*.json' -type f -exec install -Dvm 0644 {} -t "$PKG/usr/share/$vmafnam-$vmafver/model" \;
+
+mkdir -pv  $PKG/usr/doc/$PRGNAM-$VERSION/$vmafnam-$vmafver
+cp -a CHANGELOG.md LICENSE README.md $PKG/usr/doc/$PRGNAM-$VERSION/$vmafnam-$vmafver
+
+cd $TMP

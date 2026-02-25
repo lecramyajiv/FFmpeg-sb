@@ -1,0 +1,19 @@
+# HOW TO EDIT THIS FILE:
+# The "handy ruler" below makes it easier to edit a package description.
+# Line up the first '|' above the ':' following the base package name, and
+# the '|' on the right side marks the last column you can put a character in.
+# You must make exactly 11 lines for the formatting to be correct.  It's also
+# customary to leave one space after the ':' except on otherwise blank lines.
+
+       |-----handy-ruler------------------------------------------------------|
+vlc-git: vlc (VLC media player)
+vlc-git:
+vlc-git: VLC media player is a free and open source media player and multi-
+vlc-git: media framework written by the VideoLAN project. VLC is a portable
+vlc-git: multimedia player, encoder, and streamer supporting many audio and
+vlc-git: video codecs and file formats as well as DVDs, VCDs, and various
+vlc-git: streaming protocols. It is able to stream over networks and to
+vlc-git: transcode multimedia files and save them into various formats.
+vlc-git: This is the git version of VLC media player
+vlc-git:
+vlc-git: homepage: http://www.videolan.org/vlc

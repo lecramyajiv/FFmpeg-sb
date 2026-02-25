@@ -1,0 +1,398 @@
+#!/bin/bash
+
+# Slackware build script for ffmpeg-dep-O
+
+# Copyright 2025-2026 Vijay Marcel
+# All rights reserved.
+#
+# Redistribution and use of this script, with or without modification, is
+# permitted provided that the following conditions are met:
+#
+# 1. Redistributions of this script must retain the above copyright
+#    notice, this list of conditions and the following disclaimer.
+#
+# 2. Redistributions in binary form must reproduce the above copyright
+#    notice, this list of conditions and the following disclaimer in
+#    the documentation and/or other materials provided with the distribution.
+#
+#  THIS SOFTWARE IS PROVIDED BY THE AUTHOR "AS IS" AND ANY EXPRESS OR IMPLIED
+#  WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+#  MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO
+#  EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+#  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+#  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
+#  OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+#  WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
+#  OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
+#  ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+cd $(dirname $0) ; CWD=$(pwd)
+
+PRGNAM=ffmpeg-dep-O
+VERSION=${VERSION:-1.0}
+BUILD=${BUILD:-4}
+TAG=${TAG:-_SBo}
+PKGTYPE=${PKGTYPE:-tgz}
+nprocr=$(expr $(nproc))
+sys_arch=${sys_arch:-$(uname -m)}
+
+set -e
+trap 'echo "$0 FAILED at line $LINENO!" | tee -a $OUTPUT/error-${PRGNAM}.log' ERR
+
+TMP=${TMP:-/tmp/SBo}
+PKG=$TMP/package-$PRGNAM
+OUTPUT=${OUTPUT:-/tmp}
+DOCDIR=$PKG/usr/doc/$PRGNAM-$VERSION
+
+rm -rf $PKG
+mkdir -pv $TMP $PKG $OUTPUT
+mkdir -pv $DOCDIR
+
+case "$sys_arch" in
+   	x86_64) export ARCH=x86_64 ;;
+	     *) echo "This SlackBuild will not run on $sys_arch platform" && exit 1 ;;
+esac
+
+if [ "$ARCH" = "x86_64" ]; then
+  LIBDIRSUFFIX="64"
+  ARCHFLAGS="-march=native -m64 -pipe -ffunction-sections -fdata-sections -O2 -fPIC"
+  PFLAGS="-fno-delete-null-pointer-checks -Wno-incompatible-pointer-types"
+  PXXFLAGS="-fno-delete-null-pointer-checks"
+  GCFLAGS="-Wl,-O1 -Wl,--sort-section=name -Wl,--gc-sections"
+  SLKCFLAGS="$ARCHFLAGS $PFLAGS"
+  SLKCXXFLAGS="$ARCHFLAGS $PXXFLAGS"
+  SLDFLAGS="$GCFLAGS"
+else  echo "this slackbuild will work only on $ARCH" && exit 1
+fi
+
+export m=/opt/meson/bin # meson path
+export r=/opt/rust/bin # rust path
+export rl=/opt/rust/lib64
+
+PYVER=$(python3 -c 'import sys; print("%d.%d" % sys.version_info[:2])')
+export PYTHONPATH=/opt/python$PYVER/site-packages
+export PATH=$m:$r:$PATH
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$rl
+
+export CC=${CC:-gcc}
+export CXX=${CXX:-g++}
+export CFLAGS="$SLKCFLAGS"
+export CXXFLAGS="$SLKCXXFLAGS"
+export LDFLAGS="$SLDFLAGS"
+
+# Dependency name
+# Soundtouch
+sdtnam=${sdtnam:-soundtouch}
+sdtver=${sdtver:-2.4.0}
+# DevIL
+devnam=${devnam:-DevIL}
+devver=${devver:-1.8.0}
+# libmicrohttpd
+mhttnam=${mhttnam:-libmicrohttpd}
+mhttver=${mhttver:-1.0.1}
+# libmysofa
+sofanam=libmysofa
+sofaver=1.3.3
+# openapv
+apvnam=openapv
+apvver=0.2.0.4
+
+if [ ! -z "${PRINT_PACKAGE_NAME}" ]; then
+  echo "$PRGNAM-$VERSION-$ARCH-$BUILD$TAG.$PKGTYPE"
+  exit 0
+fi
+
+if pkg-config --exists libavcodec 2>/dev/null ; then
+echo "Soxr will bind to existing ffmpeg uninstall ffmpeg first and rebuild it later"
+exit 1
+fi
+
+REQUIRES=( "rust-opt" "python3-build" "python3-wheel" "python3-packaging-opt" "python3-setuptools-opt" "python3-glad" "python3-meson-opt" )
+pkgdir=/var/log/packages
+
+full=()
+empty=()
+for pkg in "${REQUIRES[@]}"; do
+if ! grep -q "$pkg" "$pkgdir"/*; then
+empty+=("$pkg")
+fi
+  if y=$(ls -1 /var/log/packages | grep -w "$pkg"); then
+        full+=("$pkg")
+    fi
+done
+if [ ${#full[@]} -ne 0 ]; then
+echo "The following Required packages are installed:"
+printf '%s\n' "${full[@]}"
+fi
+if [ ${#empty[@]} -ne 0 ]; then
+    echo "The following files are missing:"
+    printf '%s\n' "${empty[@]}"
+    echo "Install the dependencies" && exit 1
+else
+    echo "All dependencies are satisfied."
+fi
+
+DOWNLOAD=( "https://codeberg.org/soundtouch/soundtouch/archive/2.4.0.tar.gz|$sdtnam-$sdtver.tar.gz"
+           "https://downloads.sourceforge.net/project/openil/DevIL/1.8.0/DevIL-1.8.0.tar.gz|$devnam-$devver.tar.gz"
+           "https://ftpmirror.gnu.org/libmicrohttpd/libmicrohttpd-1.0.1.tar.gz|$mhttnam-$mhttver.tar.gz"
+           "https://github.com/hoene/libmysofa/archive/v1.3.3/libmysofa-1.3.3.tar.gz|$sofanam-$sofaver.tar.gz"
+           "https://github.com/AcademySoftwareFoundation/openapv/archive/v0.2.0.4/openapv-0.2.0.4.tar.gz|$apvnam-$apvver.tar.gz" )
+for entry in "${DOWNLOAD[@]}"; do
+IFS="|" read -r URL FILENAME <<< "$entry"
+if [[ -f "$FILENAME" ]]; then
+      echo "File '$FILENAME' already exists. Skipping download."
+else  echo "The files will be downloaded now"
+      wget -L "$URL" -O "$FILENAME"
+if [ $? -ne 0 ]; then
+        echo "Error: Failed to download $FILENAME"
+        exit 1
+fi
+fi
+done
+chksum=( "eec20bde8f47f27f95b931ad041d5d79|soundtouch-2.4.0.tar.gz"
+         "4d8c21aa4822ac86d77e44f8d7c9becd|DevIL-1.8.0.tar.gz"
+         "b41c83799a478ea9c774e50ed22446bc|libmicrohttpd-1.0.1.tar.gz"
+         "67b0a1ef6bad912443597266878d6058|libmysofa-1.3.3.tar.gz"
+         "229fb720634491dbb4c87fba87235c7d|openapv-0.2.0.4.tar.gz"
+       )
+for entry in "${chksum[@]}"; do
+IFS="|" read -r HASH FILENAME  <<< "$entry"
+echo "$HASH  $FILENAME" | md5sum --warn --strict --check --status
+ if [ $? -eq 0 ]; then
+        echo "SUCCESS: $FILENAME matches checksum."
+    else
+        echo "FAILURE: $FILENAME checksum mismatch!"
+        exit 1
+    fi
+done
+
+cd $TMP
+
+# Building openapv
+
+rm -rf $apvnam-$apvver
+tar xvf $CWD/$apvnam-$apvver.tar.gz
+cd $apvnam-$apvver
+chown -R root:root .
+find -L . \
+ \( -perm 777 -o -perm 775 -o -perm 750 -o -perm 711 -o -perm 555 \
+  -o -perm 511 \) -exec chmod 755 {} \+ -o \
+ \( -perm 666 -o -perm 664 -o -perm 640 -o -perm 600 -o -perm 444 \
+  -o -perm 440 -o -perm 400 \) -exec chmod 644 {} \+
+
+mkdir -pv $DOCDIR/$apvnam-$apvver
+
+cmake -B build -S $TMP/$apvnam-$apvver \
+    -DCMAKE_C_FLAGS:STRING="$SLKCFLAGS" \
+    -DCMAKE_CXX_FLAGS:STRING="$SLKCXXFLAGS" \
+    -DCMAKE_C_FLAGS_RELEASE:STRING="$SLKCFLAGS" \
+    -DCMAKE_CXX_FLAGS_RELEASE:STRING="$SLKCXXFLAGS" \
+    -DCMAKE_EXE_LINKER_FLAGS:STRING="$SLDFLAGS" \
+    -DCMAKE_INSTALL_PREFIX=/usr \
+    -DCMAKE_INSTALL_LIBDIR=/usr/lib${LIBDIRSUFFIX} \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DOAPV_APP_STATIC_BUILD=OFF
+
+cmake --build build
+DESTDIR=$PKG cmake --install build
+
+rm -f $PKG/usr/lib${LIBDIRSUFFIX}/*.la
+
+cp -a LICENSE README.md $DOCDIR/$apvnam-$apvver
+
+cd $TMP
+
+# Building soundtouch
+
+rm -rf $sdtnam-$sdtver
+rm -rf $sdtnam
+rm -rf $sdtver
+tar xvf $CWD/$sdtver.tar.gz || tar xvf $CWD/$sdtnam-$sdtver.tar.gz
+cd $sdtnam
+# Remove the dangling symlink
+rm -rvf ./source/SoundTouchDLL/LazarusTest/libSoundTouchDll.so
+chown -R root:root .
+find -L . \
+ \( -perm 777 -o -perm 775 -o -perm 750 -o -perm 711 -o -perm 555 \
+  -o -perm 511 \) -exec chmod 755 {} \+ -o \
+ \( -perm 666 -o -perm 664 -o -perm 640 -o -perm 600 -o -perm 444 \
+  -o -perm 440 -o -perm 400 \) -exec chmod 644 {} \+
+
+cmake -B build -S $TMP/$sdtnam \
+    -DCMAKE_C_FLAGS:STRING="$SLKCFLAGS" \
+    -DCMAKE_CXX_FLAGS:STRING="$SLKCXXFLAGS" \
+    -DCMAKE_C_FLAGS_RELEASE:STRING="$SLKCFLAGS" \
+    -DCMAKE_CXX_FLAGS_RELEASE:STRING="$SLKCXXFLAGS" \
+    -DCMAKE_EXE_LINKER_FLAGS:STRING="$SLDFLAGS" \
+    -DCMAKE_INSTALL_PREFIX:PATH=/usr \
+    -DCMAKE_INSTALL_LIBDIR:PATH=/usr/lib${LIBDIRSUFFIX} \
+    -DCMAKE_INSTALL_BINDIR:PATH=/usr/bin \
+    -DCMAKE_INSTALL_MANDIR:PATH=/usr/man \
+    -DCMAKE_BUILD_TYPE:STRING=Release \
+    -DBUILD_SHARED_LIBS=ON \
+    -DSOUNDSTRETCH=ON \
+    -DSOUNDTOUCH_DLL=ON
+
+cmake --build build --parallel $nprocr
+DESTDIR=$PKG cmake --install build
+
+rm -f $PKG/usr/lib${LIBDIRSUFFIX}/*.la
+
+mkdir -pv $DOCDIR/$sdtnam-$sdtver
+cp -av readme.md COPYING.TXT $DOCDIR/$sdtnam-$sdtver
+
+cd $TMP
+
+# Building DevIL
+
+rm -rf $devnam-$devver
+tar xvf $CWD/$devnam-$devver.tar.gz
+cd $devnam
+chown -R root:root .
+find -L . \
+ \( -perm 777 -o -perm 775 -o -perm 750 -o -perm 711 -o -perm 555 \
+  -o -perm 511 \) -exec chmod 755 {} \+ -o \
+ \( -perm 666 -o -perm 664 -o -perm 640 -o -perm 600 -o -perm 444 \
+  -o -perm 440 -o -perm 400 \) -exec chmod 644 {} \+
+
+mkdir -pv $DOCDIR/$devnam-$devver
+
+patch -p1 < $CWD/patches/lib64.diff
+
+cmake -B build -S $TMP/$devnam/$devnam \
+    -DCMAKE_C_FLAGS:STRING="$SLKCFLAGS -fpermissive" \
+    -DCMAKE_CXX_FLAGS:STRING="$SLKCXXFLAGS -std=c++14 -fpermissive" \
+    -DCMAKE_C_FLAGS_RELEASE:STRING="$SLKCFLAGS -fpermissive" \
+    -DCMAKE_CXX_FLAGS_RELEASE:STRING="$SLKCXXFLAGS -std=c++14 -fpermissive" \
+    -DCMAKE_EXE_LINKER_FLAGS:STRING="$SLDFLAGS" \
+    -DCMAKE_INSTALL_PREFIX=/usr \
+    -DCMAKE_INSTALL_BINDIR=/usr/bin \
+    -DLIB_SUFFIX=${LIBDIRSUFFIX} \
+    -DIL_USE_DXTC_NVIDIA=NO \
+    -DCMAKE_BUILD_TYPE=Release
+
+cmake --build build --parallel $nprocr
+DESTDIR=$PKG cmake --install build
+
+rm -f $PKG/usr/lib${LIBDIRSUFFIX}/*.la
+
+cp -a LICENSE README.md DevIL/CREDITS $DOCDIR/$devnam-$devver
+
+cd $TMP
+
+# BUILDING libmicrohttpd
+
+rm -rf $mhttnam-$mhttver
+tar xvf $CWD/$mhttnam-$mhttver.tar.gz
+cd $mhttnam-$mhttver
+chown -R root:root .
+find -L . \
+ \( -perm 777 -o -perm 775 -o -perm 750 -o -perm 711 -o -perm 555 \
+  -o -perm 511 \) -exec chmod 755 {} \+ -o \
+ \( -perm 666 -o -perm 664 -o -perm 640 -o -perm 600 -o -perm 444 \
+  -o -perm 440 -o -perm 400 \) -exec chmod 644 {} \+
+
+mkdir -pv $DOCDIR/$mhttnam-$mhttver
+
+CFLAGS="$SLKCFLAGS" \
+CXXFLAGS="$SLKCXXFLAGS" \
+LDFLAGS="$SLDFLAGS" \
+./configure \
+  --prefix=/usr \
+  --libdir=/usr/lib${LIBDIRSUFFIX} \
+  --sysconfdir=/etc \
+  --localstatedir=/var \
+  --mandir=/usr/man \
+  --infodir=/usr/info \
+  --docdir=/usr/doc/$PRGNAM-$VERSION/$mhttnam-$mhttver \
+  --enable-shared \
+  --enable-itc=pipe \
+  --enable-https \
+  --enable-poll=auto \
+  --enable-epoll=auto \
+  --enable-md5=builtin \
+  --enable-sha256=builtin \
+  --enable-sha512=builtin \
+  --enable-bauth \
+  --enable-dauth \
+  --with-threads=posix \
+  --with-gnu-ld \
+  --disable-static \
+  --disable-nls \
+  --disable-doc \
+  --disable-examples \
+  --disable-heavy-tests \
+  --disable-coverage \
+  --disable-asserts \
+  --disable-sanitizers \
+  --disable-experimental
+
+make -j$nprocr
+make install DESTDIR=$PKG
+
+rm -f $PKG/usr/lib${LIBDIRSUFFIX}/*.la
+
+cp -av AUTHORS COPYING README $DOCDIR/$mhttnam-$mhttver
+
+rm -rvf $PKG/usr/info
+
+cd $TMP
+
+# Building libmysofa
+
+rm -rf $sofanam-$sofaver
+tar xvf $CWD/$sofanam-$sofaver.tar.gz
+cd $sofanam-$sofaver
+chown -R root:root .
+find -L . \
+ \( -perm 777 -o -perm 775 -o -perm 750 -o -perm 711 -o -perm 555 \
+  -o -perm 511 \) -exec chmod 755 {} \+ -o \
+ \( -perm 666 -o -perm 664 -o -perm 640 -o -perm 600 -o -perm 444 \
+  -o -perm 440 -o -perm 400 \) -exec chmod 644 {} \+
+
+mkdir -pv $DOCDIR/$sofanam-$sofaver
+
+cmake -B $TMP/$sofanam-$sofaver/build -S $TMP/$sofanam-$sofaver \
+    -DCMAKE_C_FLAGS:STRING="$SLKCFLAGS" \
+    -DCMAKE_CXX_FLAGS:STRING="$SLKCXXFLAGS" \
+    -DCMAKE_C_FLAGS_RELEASE:STRING="$SLKCFLAGS" \
+    -DCMAKE_CXX_FLAGS_RELEASE:STRING="$SLKCXXFLAGS" \
+    -DCMAKE_EXE_LINKER_FLAGS:STRING="$SLDFLAGS" \
+    -DCMAKE_INSTALL_PREFIX:PATH=/usr \
+    -DCMAKE_INSTALL_BINDIR:PATH=/usr/bin \
+    -DCMAKE_INSTALL_DOCDIR:PATH=/usr/doc/$PRGNAM-$VERSION/$sofanam-$sofaver \
+    -DCMAKE_INSTALL_INCLUDEDIR:PATH=/usr/include \
+    -DCMAKE_INSTALL_LIBDIR:PATH=/usr/lib${LIBDIRSUFFIX} \
+    -DBUILD_SHARED_LIBS:BOOL=ON \
+    -DBUILD_STATIC_LIBS:BOOL=ON  \
+    -DBUILD_TESTS:BOOL=OFF  \
+    -DCODE_COVERAGE:BOOL=OFF \
+    -DADDRESS_SANITIZE:BOOL=OFF \
+    -DCMAKE_BUILD_TYPE:STRING=Release
+
+make -j$nprocr -C build
+make -C build install DESTDIR=$PKG
+
+mkdir -pv $PKG/usr/include/$sofanam
+install -D -v  -m0644 $TMP/$sofanam-$sofaver/build/src/config.h  -t "$PKG/usr/include/$sofanam"
+install -D -v  -m0644 $TMP/$sofanam-$sofaver/build/src/mysofa_export.h  -t "$PKG/usr/include/$sofanam"
+
+cp -a LICENSE README.md CODE_OF_CONDUCT.md SECURITY.md $DOCDIR/$sofanam-$sofaver
+
+rm -f $PKG/usr/lib${LIBDIRSUFFIX}/*.la
+
+cd $TMP
+
+find $PKG -print0 | xargs -0 file | grep -e "executable" -e "shared object" | grep ELF \
+  | cut -f 1 -d : | xargs strip --strip-unneeded --remove-section=.comment --remove-section=.note 2> /dev/null || true
+
+find $PKG/usr/lib${LIBDIRSUFFIX} -type f -exec chmod 0755 {} \+
+find $PKG/usr/lib${LIBDIRSUFFIX} -type f -name "*.a" -exec chmod -v 0644 {} \+
+cat $CWD/$PRGNAM.SlackBuild > $DOCDIR/$PRGNAM.SlackBuild
+find $DOCDIR -type f -exec chmod 0644 {} \+
+
+mkdir -p $PKG/install
+cat $CWD/slack-desc > $PKG/install/slack-desc
+
+cd $PKG
+/sbin/makepkg -l y -c n --remove-rpaths --remove-tmp-rpaths $OUTPUT/$PRGNAM-$VERSION-$ARCH-$BUILD$TAG.$PKGTYPE

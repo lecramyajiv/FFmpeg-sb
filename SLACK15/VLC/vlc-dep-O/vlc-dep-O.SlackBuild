@@ -1,0 +1,654 @@
+#!/bin/bash
+
+# Slackware build script for vlc-dep-O
+
+# Copyright 2026 Vijay Marcel
+# All rights reserved.
+#
+# Redistribution and use of this script, with or without modification, is
+# permitted provided that the following conditions are met:
+#
+# 1. Redistributions of this script must retain the above copyright
+#    notice, this list of conditions and the following disclaimer.
+#
+# 2. Redistributions in binary form must reproduce the above copyright
+#    notice, this list of conditions and the following disclaimer in
+#    the documentation and/or other materials provided with the distribution.
+#
+#  THIS SOFTWARE IS PROVIDED BY THE AUTHOR "AS IS" AND ANY EXPRESS OR IMPLIED
+#  WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+#  MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO
+#  EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+#  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+#  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
+#  OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+#  WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
+#  OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
+#  ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+cd $(dirname $0) ; CWD=$(pwd)
+
+PRGNAM=vlc-dep-O
+VERSION=${VERSION:-1.0}
+BUILD=${BUILD:-4}
+TAG=${TAG:-_SBo}
+PKGTYPE=${PKGTYPE:-tgz}
+nprocr=$(expr $(nproc))
+sys_arch=${sys_arch:-$(uname -m)}
+
+set -e
+trap 'echo "$0 FAILED at line $LINENO!" | tee -a $OUTPUT/error-${PRGNAM}.log' ERR
+
+TMP=${TMP:-/tmp/SBo}
+PKG=$TMP/package-$PRGNAM
+OUTPUT=${OUTPUT:-/tmp}
+DOCDIR=$PKG/usr/doc/$PRGNAM-$VERSION
+
+case "$sys_arch" in
+   	x86_64) export ARCH=x86_64 ;;
+	     *) echo "This SlackBuild will not run on $sys_arch platform" && exit 1 ;;
+esac
+
+if [ "$ARCH" = "x86_64" ]; then
+  LIBDIRSUFFIX="64"
+  ARCHFLAGS="-march=native -m64 -pipe -ffunction-sections -fdata-sections -O2 -fPIC"
+  PFLAGS="-fno-delete-null-pointer-checks -Wno-incompatible-pointer-types"
+  PXXFLAGS="-fno-delete-null-pointer-checks"
+  GCFLAGS="-Wl,-O1 -Wl,--sort-section=name -Wl,--gc-sections"
+  SLKCFLAGS="$ARCHFLAGS $PFLAGS"
+  SLKCXXFLAGS="$ARCHFLAGS $PXXFLAGS"
+  SLDFLAGS="$GCFLAGS"
+else  
+echo "this slackbuild will work only on $ARCH" && exit 1
+fi
+
+export m=/opt/meson/bin # meson path
+export r=/opt/rust/bin # rust path
+export rl=/opt/rust/lib64
+
+PYVER=$(python3 -c 'import sys; print("%d.%d" % sys.version_info[:2])')
+export PYTHONPATH=/opt/python$PYVER/site-packages
+export PATH=$m:$r:$PATH
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$rl
+
+export CC=${CC:-gcc}
+export CXX=${CXX:-g++}
+export CFLAGS="$SLKCFLAGS"
+export CXXFLAGS="$SLKCXXFLAGS"
+export LDFLAGS="$SLDFLAGS"
+
+rm -rf $PKG
+mkdir -pv $TMP $PKG $OUTPUT
+mkdir -pv $DOCDIR
+
+if [ ! -z "${PRINT_PACKAGE_NAME}" ]; then
+  echo "$PRGNAM-$VERSION-$ARCH-$BUILD$TAG.$PKGTYPE"
+  exit 0
+fi
+
+# dependency name
+
+# ASDCPLIB
+
+asdcpnam=asdcplib
+asdcpver=2.7.19
+
+# Dirac
+
+diracnam=dirac
+diracver=1.0.2
+diraccom=a57c2c5e58062d437d9ab13dffb28f0f
+
+#libtiger
+tigernam=libtiger
+tigerver=0.3.4
+
+#libtar
+tarnam=libtar
+tarver=0907a90
+
+# Aribb25
+aribnam=aribb25
+aribver=0.2.7
+
+#ftgl
+
+ftgnam=ftgl
+ftgver=2.4.0
+
+# glm
+
+glmnam=glm
+glmver=1.0.3
+
+# libnfs
+
+nfsnam=libnfs
+nfsver=6.0.2
+
+# GLFW3
+glfnam=glfw
+glfver=3.4
+
+# ebur128
+eburnam=libebur128
+eburver=1.2.6
+
+
+REQUIRES=( "gst-plugins-bad" "gst-plugins-ugly" "ffmpeg-dep-III" "protobuf3" "luajit" "pcsc-lite" )
+pkgdir=/var/log/packages
+
+full=()
+empty=()
+for pkg in "${REQUIRES[@]}"; do
+if ! grep -q "$pkg" "$pkgdir"/*; then
+empty+=("$pkg")
+fi
+  if y=$(ls -1 /var/log/packages | grep -w "$pkg"); then
+        full+=("$pkg")
+    fi
+done
+if [ ${#full[@]} -ne 0 ]; then
+echo "The following Required packages are installed:"
+printf '%s\n' "${full[@]}"
+fi
+if [ ${#empty[@]} -ne 0 ]; then
+    echo "The following files are missing:"
+    printf '%s\n' "${empty[@]}"
+    echo "Install the dependencies" && exit 1
+else
+    echo "All dependencies are satisfied."
+fi
+
+DOWNLOAD=( "http://download.cinecert.com/asdcplib/asdcplib-$asdcpver.tar.gz|asdcplib-$asdcpver.tar.gz"
+"http://pkgs.fedoraproject.org/repo/pkgs/dirac/dirac-1.0.2.tar.gz/$diraccom/dirac-1.0.2.tar.gz|$diracnam-$diracver.tar.gz"
+"https://download.videolan.org/pub/contrib/tiger/libtiger-0.3.4.tar.gz|$tigernam-$tigerver.tar.gz"
+"http://sourceforge.net/projects/slackbuildsdirectlinks/files/libtar/libtar-0907a90.tar.gz|$tarnam-$tarver.tar.gz"
+"https://code.videolan.org/videolan/aribb25/-/archive/0.2.7/aribb25-0.2.7.tar.gz|$aribnam-$aribver.tar.gz"
+"https://github.com/frankheckenbach/ftgl/archive/v2.4.0/ftgl-2.4.0.tar.gz|$ftgnam-$ftgver.tar.gz"
+"https://github.com/jiixyj/libebur128/archive/v1.2.6/libebur128-1.2.6.tar.gz|$eburnam-$eburver.tar.gz"
+"https://github.com/sahlberg/libnfs/archive/libnfs-6.0.2/libnfs-libnfs-6.0.2.tar.gz|$nfsnam-$nfsnam-$nfsver.tar.gz"
+"https://github.com/glfw/glfw/archive/3.4/glfw-3.4.tar.gz|$glfnam-$glfver.tar.gz"
+"https://github.com/g-truc/glm/archive/1.0.3/glm-1.0.3.tar.gz|$glmnam-$glmver.tar.gz" )
+
+for entry in "${DOWNLOAD[@]}"; do
+# Parse URL and FILENAME safely
+IFS='|' read -r URL FILENAME <<< "$entry"
+# Validate entry format
+if [[ -z "$URL" || -z "$FILENAME" ]]; then
+        echo "Invalid entry: '$entry' (expected URL|FILENAME)"
+        continue
+fi
+# Check if file already exists and is non-empty
+if [[ -s "$FILENAME" ]]; then
+        echo "File '$FILENAME' already exists. Skipping download."
+        continue
+fi
+echo "Downloading '$FILENAME'..."
+# Attempt download
+if wget -L "$URL" -O "$FILENAME"; then
+        # Verify file is not empty
+if [[ ! -s "$FILENAME" ]]; then
+            echo "Error: Downloaded file '$FILENAME' is empty."
+            rm -f "$FILENAME"
+else
+            echo "Downloaded '$FILENAME' successfully."
+fi
+else
+echo "Error: Failed to download '$FILENAME'"rm -f "$FILENAME"
+continue
+fi
+done
+
+chksum=("f9290440d1645cc834cfb9fb5a337348|asdcplib-2.7.19.tar.gz"
+"a57c2c5e58062d437d9ab13dffb28f0f|dirac-1.0.2.tar.gz"
+"dc1dbeb658c95485ba10b9b2897b4ae2|libtiger-0.3.4.tar.gz"
+"b1126ce784d76f62fc1a5612f6569635|libtar-0907a90.tar.gz"
+"e5f889b7103af38417bbe8a707f926d1|aribb25-0.2.7.tar.gz"
+"fba1e1c548ebe3ab362495e96a7a0670|ftgl-2.4.0.tar.gz"
+"d38c5f86f5dccb37b5818b853ad49f32|libebur128-1.2.6.tar.gz"
+"36efdd459200a2504c84f89786270daf|libnfs-libnfs-6.0.2.tar.gz"
+"7470db601fcf36f0604d32b537281a70|glfw-3.4.tar.gz"
+"2192069d8d0091ff1cca041cdcdc85fe|glm-1.0.3.tar.gz" )
+
+for entry in "${chksum[@]}"; do
+IFS="|" read -r HASH FILENAME <<< "$entry"
+echo "$HASH  $FILENAME" | md5sum --warn --strict --check --status
+ if [ $? -eq 0 ]; then
+        echo "SUCCESS: $FILENAME matches checksum."
+    else
+        echo "FAILURE: $FILENAME checksum mismatch!"
+        exit 1
+    fi
+done
+
+cd $TMP
+
+# Building libebur
+
+rm -rf $eburnam-$eburver
+tar xvf $CWD/$eburnam-$eburver.tar.gz
+cd $eburnam-$eburver
+chown -R root:root .
+find -L . \
+ \( -perm 777 -o -perm 775 -o -perm 750 -o -perm 711 -o -perm 555 \
+  -o -perm 511 \) -exec chmod 755 {} \+ -o \
+ \( -perm 666 -o -perm 664 -o -perm 640 -o -perm 600 -o -perm 444 \
+  -o -perm 440 -o -perm 400 \) -exec chmod 644 {} \+
+
+cmake -B build -S $TMP/$eburnam-$eburver \
+    -DCMAKE_C_FLAGS:STRING="$SLKCFLAGS" \
+    -DCMAKE_CXX_FLAGS:STRING="$SLKCXXFLAGS" \
+    -DCMAKE_C_FLAGS_RELEASE:STRING="$SLKCFLAGS" \
+    -DCMAKE_CXX_FLAGS_RELEASE:STRING="$SLKCXXFLAGS" \
+    -DCMAKE_EXE_LINKER_FLAGS:STRING="$SLDFLAGS" \
+    -DCMAKE_INSTALL_PREFIX:PATH=/usr \
+    -DCMAKE_INSTALL_BINDIR:PATH=/usr/bin \
+    -DCMAKE_INSTALL_DOCDIR:PATH=/usr/doc \
+    -DCMAKE_INSTALL_INCLUDEDIR:PATH=/usr/include \
+    -DCMAKE_INSTALL_LIBDIR:PATH=/usr/lib${LIBDIRSUFFIX} \
+    -DBUILD_SHARED_LIBS:BOOL=ON \
+    -DCMAKE_BUILD_TYPE:STRING=Release \
+    -DENABLE_FUZZER=OFF \
+    -DENABLE_TESTS=OFF
+
+cmake --build build --parallel $nprocr
+DESTDIR=$PKG cmake --install build
+
+mkdir -pv $DOCDIR/$eburnam-$eburver
+cp -av COPYING README.md $DOCDIR/$eburnam-$eburver
+
+cd $TMP
+
+# Building GLFW3
+
+rm -rf $glfnam-$glfver
+tar xvf $CWD/$glfnam-$glfver.tar.gz
+cd $glfnam-$glfver
+chown -R root:root .
+find -L . \
+ \( -perm 777 -o -perm 775 -o -perm 750 -o -perm 711 -o -perm 555 \
+  -o -perm 511 \) -exec chmod 755 {} \+ -o \
+ \( -perm 666 -o -perm 664 -o -perm 640 -o -perm 600 -o -perm 444 \
+  -o -perm 440 -o -perm 400 \) -exec chmod 644 {} \+
+
+cmake -B build -S $TMP/$glfnam-$glfver \
+    -DCMAKE_C_FLAGS:STRING="$SLKCFLAGS" \
+    -DCMAKE_CXX_FLAGS:STRING="$SLKCXXFLAGS" \
+    -DCMAKE_C_FLAGS_RELEASE:STRING="$SLKCFLAGS" \
+    -DCMAKE_CXX_FLAGS_RELEASE:STRING="$SLKCXXFLAGS" \
+    -DCMAKE_EXE_LINKER_FLAGS:STRING="$SLDFLAGS" \
+    -DCMAKE_INSTALL_PREFIX:PATH=/usr \
+    -DCMAKE_INSTALL_BINDIR:PATH=/usr/bin \
+    -DCMAKE_INSTALL_DOCDIR:PATH=/usr/doc \
+    -DCMAKE_INSTALL_INCLUDEDIR:PATH=/usr/include \
+    -DCMAKE_INSTALL_LIBDIR:PATH=/usr/lib${LIBDIRSUFFIX} \
+    -DBUILD_SHARED_LIBS:BOOL=ON \
+    -DCMAKE_BUILD_TYPE:STRING=Release \
+    -DGLFW_BUILD_X11=ON \
+    -DGLFW_BUILD_WAYLAND=ON \
+    -DGLFW_LIBRARY_TYPE=SHARED \
+    -DUSE_MSVC_RUNTIME_LIBRARY_DLL=OFF \
+    -DGLFW_USE_HYBRID_HPG=OFF \
+    -DGLFW_BUILD_EXAMPLES=OFF \
+    -DGLFW_BUILD_DOCS=OFF \
+    -DGLFW_BUILD_TESTS=OFF \
+    -DGLFW_BUILD_WIN32=OFF \
+    -DGLFW_BUILD_COCOA=OFF
+
+cmake --build build --parallel $nprocr
+DESTDIR=$PKG cmake --install build
+
+mkdir -pv $DOCDIR/$glfnam-$glfver
+cp -av LICENSE.md README.md $DOCDIR/$glfnam-$glfver
+
+cd $TMP
+
+# Building asdcplib
+
+rm -rf $asdcpnam-$asdcpver.tar.gz
+tar xvf $CWD/$asdcpnam-$asdcpver.tar.gz
+cd $asdcpnam-$asdcpver
+chown -R root:root .
+find -L . \
+ \( -perm 777 -o -perm 775 -o -perm 750 -o -perm 711 -o -perm 555 \
+  -o -perm 511 \) -exec chmod 755 {} \+ -o \
+ \( -perm 666 -o -perm 664 -o -perm 640 -o -perm 600 -o -perm 444 \
+  -o -perm 440 -o -perm 400 \) -exec chmod 644 {} \+
+
+patch -p1 --verbose < $CWD/patches/0001-Remove-a-broken-unused-template-class.patch
+patch -p1 --verbose < $CWD/patches/adding-pkg-config-file.patch
+patch -p1 --verbose < $CWD/patches/port-to-nettle.patch
+patch -p1 --verbose < $CWD/patches/static-programs.patch
+patch -p1 --verbose < $CWD/patches/win32-cross-compilation.patch
+patch -p1 --verbose < $CWD/patches/win32-dirent.patch
+
+
+autoreconf -fiv
+
+CFLAGS="$SLKCFLAGS" \
+CXXFLAGS="$SLKCXXFLAGS -std=gnu++98" \
+LDFLAGS="$SLDFLAGS" \
+./configure \
+  --prefix=/usr \
+  --includedir=/usr/include \
+  --sysconfdir=/etc \
+  --libdir=/usr/lib${LIBDIRSUFFIX} \
+  --localstatedir=/var \
+  --mandir=/usr/man \
+  --infodir=/usr/info \
+  --enable-shared \
+  --enable-dev-headers \
+  --enable-freedist \
+  --enable-static \
+  --with-nettle \
+  --with-expat=yes \
+  --with-xerces=yes \
+  --with-gnu-ld
+
+make -j$nprocr
+make install DESTDIR=$PKG
+
+mkdir -pv $DOCDIR/$asdcpnam-$asdcpver
+cp -av COPYING README $DOCDIR/$asdcpnam-$asdcpver
+
+cd $TMP
+
+rm -rf $diracnam-$diracver
+tar xvf $CWD/$diracnam-$diracver.tar.gz
+cd $diracnam-$diracver
+chown -R root:root .
+find -L . \
+ \( -perm 777 -o -perm 775 -o -perm 750 -o -perm 711 -o -perm 555 \
+  -o -perm 511 \) -exec chmod 755 {} \+ -o \
+ \( -perm 666 -o -perm 664 -o -perm 640 -o -perm 600 -o -perm 444 \
+  -o -perm 440 -o -perm 400 \) -exec chmod 644 {} \+
+
+patch -p1 < $CWD/patches/encoder.patch
+patch -p1 < $CWD/patches/gcc45.patch
+
+# -Werror breaks build on 14.0
+sed -i "s|\ -Werror\"|\"|" configure
+
+CFLAGS="$SLKCFLAGS" \
+CXXFLAGS="$SLKCXXFLAGS -std=c++11" \
+LDFLAGS="$SLDFLAGS" \
+./configure \
+  --prefix=/usr \
+  --includedir=/usr/include \
+  --sysconfdir=/etc \
+  --libdir=/usr/lib${LIBDIRSUFFIX} \
+  --localstatedir=/var \
+  --mandir=/usr/man \
+  --infodir=/usr/info \
+  --enable-shared \
+  --enable-static \
+  --enable-mmx \
+  --with-gnu-ld \
+  --disable-profile \
+  --disable-debug
+
+make -j$nprocr
+make install DESTDIR=$PKG
+
+mkdir -pv $DOCDIR/$diracnam-$diracver
+cp -av AUTHORS COPYING README $DOCDIR/$diracnam-$diracver
+
+cd $TMP
+
+# Building libtiger
+
+rm -rf $tigernam-$tigerver
+tar xvf $CWD/$tigernam-$tigerver.tar.gz
+cd $tigernam-$tigerver
+chown -R root:root .
+find -L . \
+ \( -perm 777 -o -perm 775 -o -perm 750 -o -perm 711 -o -perm 555 \
+  -o -perm 511 \) -exec chmod 755 {} \+ -o \
+ \( -perm 666 -o -perm 664 -o -perm 640 -o -perm 600 -o -perm 444 \
+  -o -perm 440 -o -perm 400 \) -exec chmod 644 {} \+
+
+CFLAGS="$SLKCFLAGS" \
+CXXFLAGS="$SLKCXXFLAGS" \
+LDFLAGS="$SLDFLAGS" \
+./configure \
+  --prefix=/usr \
+  --includedir=/usr/include \
+  --sysconfdir=/etc \
+  --libdir=/usr/lib${LIBDIRSUFFIX} \
+  --localstatedir=/var \
+  --mandir=/usr/man \
+  --infodir=/usr/info \
+  --enable-shared \
+  --enable-static \
+  --with-gnu-ld \
+  --disable-doc \
+  --disable-pthread \
+  --disable-debug \
+  --disable-profile
+
+make -j$nprocr
+make install DESTDIR=$PKG
+
+mkdir -pv $DOCDIR/$tigernam-$tigerver
+cp -av  AUTHORS COPYING README $DOCDIR/$tigernam-$tigerver
+
+cd $TMP
+
+# Building libtar
+
+rm -rf $tarnam-$tarver
+tar xvf $CWD/$tarnam-$tarver.tar.gz
+cd $tarnam-$tarver
+chown -R root:root .
+find -L . \
+ \( -perm 777 -o -perm 775 -o -perm 750 -o -perm 711 -o -perm 555 \
+  -o -perm 511 \) -exec chmod 755 {} \+ -o \
+ \( -perm 666 -o -perm 664 -o -perm 640 -o -perm 600 -o -perm 444 \
+  -o -perm 440 -o -perm 400 \) -exec chmod 644 {} \+
+
+autoreconf -fiv
+CFLAGS="$SLKCFLAGS" \
+CXXFLAGS="$SLKCXXFLAGS" \
+LDFLAGS="$SLDFLAGS" \
+./configure \
+  --prefix=/usr \
+  --includedir=/usr/include \
+  --sysconfdir=/etc \
+  --libdir=/usr/lib${LIBDIRSUFFIX} \
+  --localstatedir=/var \
+  --mandir=/usr/man \
+  --infodir=/usr/info \
+  --enable-shared \
+  --enable-static \
+  --with-gnu-ld
+
+make -j$nprocr
+make install DESTDIR=$PKG
+
+mkdir -pv $DOCDIR/$tarnam-$tarver
+cp -av  AUTHORS COPYRIGHT README $DOCDIR/$tarnam-$tarver
+
+cd $TMP
+
+# Building aribb25
+
+rm -rf $aribnam-$aribver
+tar xvf $CWD/$aribnam-$aribver.tar.gz
+cd $aribnam-$aribver
+chown -R root:root .
+find -L . \
+ \( -perm 777 -o -perm 775 -o -perm 750 -o -perm 711 -o -perm 555 \
+  -o -perm 511 \) -exec chmod 755 {} \+ -o \
+ \( -perm 666 -o -perm 664 -o -perm 640 -o -perm 600 -o -perm 444 \
+  -o -perm 440 -o -perm 400 \) -exec chmod 644 {} \+
+
+# patches from vlc version 3.0.23
+patch -p1 --unified --verbose < $CWD/patches/fix-libs.patch
+
+./bootstrap
+CFLAGS="$SLKCFLAGS" \
+CXXFLAGS="$SLKCXXFLAGS" \
+LDFLAGS="$SLDFLAGS" \
+./configure \
+  --prefix=/usr \
+  --includedir=/usr/include \
+  --sysconfdir=/etc \
+  --libdir=/usr/lib${LIBDIRSUFFIX} \
+  --localstatedir=/var \
+  --mandir=/usr/man \
+  --infodir=/usr/info \
+  --enable-shared \
+  --enable-static
+
+make -j$nprocr
+make install DESTDIR=$PKG
+
+mkdir -pv $DOCDIR/$aribnam-$aribver
+cp -av LICENCE README.md README.jp.txt $DOCDIR/$aribnam-$aribver
+
+cd $TMP
+
+# Building ftgl
+
+rm -rf $ftgnam-$ftgver
+tar xvf $CWD/$ftgnam-$ftgver.tar.gz
+cd $ftgnam-$ftgver
+chown -R root:root .
+find -L . \
+ \( -perm 777 -o -perm 775 -o -perm 750 -o -perm 711 -o -perm 555 \
+  -o -perm 511 \) -exec chmod 755 {} \+ -o \
+ \( -perm 666 -o -perm 664 -o -perm 640 -o -perm 600 -o -perm 444 \
+  -o -perm 440 -o -perm 400 \) -exec chmod 644 {} \+
+
+# https://github.com/HamzaM3/ftgl/pull/1/commits/37ed7d606a0dfecdcb4ab0c26d1b0132cd96d5fa
+patch -p1 < $CWD/patches/0001-Fix-type-mismatch-with-latest-FreeType.patch
+
+./autogen.sh
+CFLAGS="$SLKCFLAGS" \
+CXXFLAGS="$SLKCXXFLAGS" \
+LDFLAGS="$SLDFLAGS" \
+./configure \
+  --prefix=/usr \
+  --includedir=/usr/include \
+  --sysconfdir=/etc \
+  --libdir=/usr/lib${LIBDIRSUFFIX} \
+  --localstatedir=/var \
+  --mandir=/usr/man \
+  --infodir=/usr/info \
+  --enable-shared \
+  --enable-static \
+  --disable-doc \
+  --with-gnu-ld \
+  --with-x
+
+make -j$nprocr GLUT_LIBS="-lglut -lGLU -lGL -lm"
+make install-strip DESTDIR=$PKG
+
+mkdir -pv $DOCDIR/$ftgnam-$ftgver
+cp -av  AUTHORS COPYING README $DOCDIR/$ftgnam-$ftgver
+mv $PKG/usr/share/doc/$ftgnam/* $DOCDIR/$ftgnam-$ftgver
+rm -rf $PKG/usr/share
+
+cd $TMP
+
+# Building glm
+
+rm -rf $glmnam-$glmver
+tar xvf $CWD/$glmnam-$glmver.tar.gz
+cd $glmnam-$glmver
+chown -R root:root .
+find -L . \
+ \( -perm 777 -o -perm 775 -o -perm 750 -o -perm 711 -o -perm 555 \
+  -o -perm 511 \) -exec chmod 755 {} \+ -o \
+ \( -perm 666 -o -perm 664 -o -perm 640 -o -perm 600 -o -perm 444 \
+  -o -perm 440 -o -perm 400 \) -exec chmod 644 {} \+
+
+cmake -B build -S $TMP/$glmnam-$glmver \
+    -DCMAKE_C_FLAGS:STRING="$SLKCFLAGS" \
+    -DCMAKE_CXX_FLAGS:STRING="$SLKCXXFLAGS" \
+    -DCMAKE_C_FLAGS_RELEASE:STRING="$SLKCFLAGS" \
+    -DCMAKE_CXX_FLAGS_RELEASE:STRING="$SLKCXXFLAGS" \
+    -DCMAKE_EXE_LINKER_FLAGS:STRING="$SLDFLAGS" \
+    -DCMAKE_INSTALL_PREFIX:PATH=/usr \
+    -DCMAKE_INSTALL_BINDIR:PATH=/usr/bin \
+    -DCMAKE_INSTALL_DOCDIR:PATH=/usr/doc \
+    -DCMAKE_INSTALL_INCLUDEDIR:PATH=/usr/include \
+    -DCMAKE_INSTALL_LIBDIR:PATH=/usr/lib${LIBDIRSUFFIX} \
+    -DBUILD_SHARED_LIBS:BOOL=ON \
+    -DCMAKE_BUILD_TYPE:STRING=Release \
+    -DGLM_BUILD_LIBRARY=ON \
+    -DGLM_ENABLE_CXX_11=ON \
+    -DGLM_ENABLE_LANG_EXTENSIONS=ON \
+    -DGLM_ENABLE_SIMD_SSE2=ON \
+    -DGLM_ENABLE_SIMD_AVX=ON \
+    -DGLM_TEST_ENABLE=OFF \
+    -DGLM_TEST_ENABLE_CXX_11=OFF
+
+cmake --build build --parallel $nprocr
+DESTDIR=$PKG cmake --install build
+
+mkdir -pv $DOCDIR/$glmnam-$glmver
+cp -av manual.md readme.md copying.txt $DOCDIR/$glmnam-$glmver
+
+cd $TMP
+
+# Building libnfs
+
+# Building libnfs
+
+rm -rf $nfsnam-$nfsnam-$nfsver
+tar xvf $CWD/$nfsnam-$nfsnam-$nfsver.tar.gz
+cd $nfsnam-$nfsnam-$nfsver
+chown -R root:root .
+find -L . \
+ \( -perm 777 -o -perm 775 -o -perm 750 -o -perm 711 -o -perm 555 \
+  -o -perm 511 \) -exec chmod 755 {} \+ -o \
+ \( -perm 666 -o -perm 664 -o -perm 640 -o -perm 600 -o -perm 444 \
+  -o -perm 440 -o -perm 400 \) -exec chmod 644 {} \+
+
+./bootstrap
+CFLAGS="$SLKCFLAGS" \
+CXXFLAGS="$SLKCXXFLAGS" \
+LDFLAGS="$SLDFLAGS" \
+./configure \
+  --prefix=/usr \
+  --libdir=/usr/lib${LIBDIRSUFFIX} \
+  --mandir=/usr/man \
+  --enable-utils \
+  --enable-pthread \
+  --with-gnu-ld   \
+  --disable-examples \
+  --disable-dependency-tracking \
+  --disable-silent-rules \
+  --disable-static
+
+make clean
+make -j$nprocr
+make install DESTDIR=$PKG
+
+mkdir -pv $DOCDIR/$nfsnam-$nfsver
+cp -av COPYING LICENCE* README* $DOCDIR/$nfsnam-$nfsver
+
+cd $TMP
+
+rm -f $PKG/usr/lib${LIBDIRSUFFIX}/*.la
+
+find $PKG -print0 | xargs -0 file | grep -e "executable" -e "shared object" \
+  | grep ELF | cut -f 1 -d : | xargs strip --strip-unneeded --remove-section=.comment --remove-section=.note  2> /dev/null || true
+
+find $PKG/usr/man -type f -exec gzip -9 {} \;
+for i in $( find $PKG/usr/man -type l ) ; do ln -s $( readlink $i ).gz $i.gz ; rm $i ; done
+
+cat $CWD/$PRGNAM.SlackBuild > $DOCDIR/$PRGNAM.SlackBuild
+find $DOCDIR -type f -exec chmod 0644 {} \+
+find $PKG/usr/lib${LIBDIRSUFFIX} -type f -exec chmod 0755 {} \+
+find $PKG/usr/lib${LIBDIRSUFFIX} -name '*.a'  -type f -exec chmod 0644 {} \+
+
+mkdir -p $PKG/install
+cat $CWD/slack-desc > $PKG/install/slack-desc
+cat $CWD/doinst.sh > $PKG/install/doinst.sh
+
+
+cd $PKG
+/sbin/makepkg -l y -c n --remove-rpaths --remove-tmp-rpaths $OUTPUT/$PRGNAM-$VERSION-$ARCH-$BUILD$TAG.$PKGTYPE

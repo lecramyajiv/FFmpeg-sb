@@ -1,0 +1,105 @@
+# vsxu
+# Building from personal repo instead of archived repo
+vsxnam=vsxu
+vsxver=0.6.3.0
+lzhaurl=${lzhamurl:-https://github.com/vovoid/lzham_codec.git}
+
+# x262 # This messes up with x264
+x262nam=x262
+x262url=${x262url:-http://git.videolan.org/git/x262.git}
+
+# rnnoise # remove it for now we can add it later
+
+rnnam=rnnoise
+rnurl=${rnurl:-https://github.com/xiph/rnnoise.git}
+
+# Building x262
+
+git clone --depth 1 $x262url
+cd $x262nam
+chown -R root:root .
+find -L . \
+ \( -perm 777 -o -perm 775 -o -perm 750 -o -perm 711 -o -perm 555 \
+  -o -perm 511 \) -exec chmod 755 {} \+ -o \
+ \( -perm 666 -o -perm 664 -o -perm 640 -o -perm 600 -o -perm 444 \
+  -o -perm 440 -o -perm 400 \) -exec chmod 644 {} \+
+
+CFLAGS="$SLKCFLAGS" \
+CXXFLAGS="$SLKCXXFLAGS" \
+LDFLAGS="$SLDFLAGS" \
+./configure \
+  --prefix=/usr \
+  --includedir=/usr/include \
+  --sysconfdir=/etc \
+  --libdir=/usr/lib${LIBDIRSUFFIX} \
+  --localstatedir=/var \
+  --mandir=/usr/man \
+  --infodir=/usr/info \
+  --system-libx264   \
+  --enable-static  \
+  --disable-gpl  \
+  --enable-visualize \
+  --bit-depth=10 \
+  --chroma-format=all \
+  --disable-cli \
+  --disable-avs \
+  --disable-lavf \
+  --disable-ffms
+
+# Compensate more for lack of maturity:
+sed -i -e "s/x264.pc/x262.pc/g" Makefile
+sed -i -e "s/x264.h/x262.h/g" Makefile
+
+make ${NUMJOBS} 2>&1 | tee $OUTPUT/make-${PRGNAM}_x262.log
+
+# Compensate even a bit more for lack of maturity:
+cp x264.h x262.h
+
+make -j$nprocr
+make install DESTDIR=$PKG
+
+mkdir -pv $DOCDIR/$x262nam
+cp -av AUTHORS COPYING $DOCDIR/$x262nam
+
+cd $TMP
+
+# Building rnnoise
+
+git clone --depth 1 $rnurl
+cd $rnnam
+chown -R root:root .
+find -L . \
+ \( -perm 777 -o -perm 775 -o -perm 750 -o -perm 711 -o -perm 555 \
+  -o -perm 511 \) -exec chmod 755 {} \+ -o \
+ \( -perm 666 -o -perm 664 -o -perm 640 -o -perm 600 -o -perm 444 \
+  -o -perm 440 -o -perm 400 \) -exec chmod 644 {} \+
+
+./autogen.sh
+CFLAGS="$SLKCFLAGS" \
+CXXFLAGS="$SLKCXXFLAGS" \
+LDFLAGS="$SLDFLAGS" \
+./configure \
+  --prefix=/usr \
+  --includedir=/usr/include \
+  --sysconfdir=/etc \
+  --libdir=/usr/lib${LIBDIRSUFFIX} \
+  --localstatedir=/var \
+  --mandir=/usr/man \
+  --infodir=/usr/info \
+  --enable-shared \
+  --enable-static  \
+  --enable-dnn-debug-float \
+  --disable-assertions  \
+  --disable-examples \
+  --disable-doc \
+  --with-gnu-ld
+
+make -j$nprocr
+make install DESTDIR=$PKG
+
+mkdir -pv $DOCDIR/$rnnam
+cp -av AUTHORS COPYING README $DOCDIR/$rnnam
+
+rm -f $PKG/usr/lib${LIBDIRSUFFIX}/*.la
+
+cd $TMP
