@@ -1,0 +1,16 @@
+FFmpeg is a complete solution to record, convert and stream audio
+and video. It includes libavcodec, the leading audio/video codec
+library.
+
+libcelt is superseded by libopus.
+Newer version of lensfun is needed.
+lesser version of vmaf is needed.
+lesser version of opencv is needed.
+other tls version such as libressl,mbedtls,gmp and
+gnutls are disabled.Use OpenSSL instead.
+libtesseract,libmysofa and pocketsphinx are disabled.
+xavs and xavs2 are less popular formats and are disabled. The
+decoders are enabled.
+lv2,JACK,tensorflow,rabbitmq,openvino are disabled.
+other platform plugins are disabled.
+Jni,AMD and Nvidia support are disabled.Only libmfx is supported.

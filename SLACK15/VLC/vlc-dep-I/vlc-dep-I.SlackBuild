@@ -1,0 +1,534 @@
+#!/bin/bash
+
+# Slackware build script for vlc-dep-I
+
+# Copyright 2026 Vijay Marcel
+# All rights reserved.
+#
+# Redistribution and use of this script, with or without modification, is
+# permitted provided that the following conditions are met:
+#
+# 1. Redistributions of this script must retain the above copyright
+#    notice, this list of conditions and the following disclaimer.
+#
+# 2. Redistributions in binary form must reproduce the above copyright
+#    notice, this list of conditions and the following disclaimer in
+#    the documentation and/or other materials provided with the distribution.
+#
+#  THIS SOFTWARE IS PROVIDED BY THE AUTHOR "AS IS" AND ANY EXPRESS OR IMPLIED
+#  WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+#  MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO
+#  EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+#  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+#  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
+#  OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+#  WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
+#  OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
+#  ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+cd $(dirname $0) ; CWD=$(pwd)
+
+PRGNAM=vlc-dep-I
+VERSION=${VERSION:-1.0}
+BUILD=${BUILD:-3}
+TAG=${TAG:-_SBo}
+PKGTYPE=${PKGTYPE:-tgz}
+nprocr=$(expr $(nproc))
+sys_arch=${sys_arch:-$(uname -m)}
+
+set -e
+trap 'echo "$0 FAILED at line $LINENO!" | tee -a $OUTPUT/error-${PRGNAM}.log' ERR
+
+TMP=${TMP:-/tmp/SBo}
+PKG=$TMP/package-$PRGNAM
+OUTPUT=${OUTPUT:-/tmp}
+DOCDIR=$PKG/usr/doc/$PRGNAM-$VERSION
+
+case "$sys_arch" in
+   	x86_64) export ARCH=x86_64 ;;
+	     *) echo "This SlackBuild will not run on $sys_arch platform" && exit 1 ;;
+esac
+
+if [ "$ARCH" = "x86_64" ]; then
+  LIBDIRSUFFIX="64"
+  ARCHFLAGS="-march=native -m64 -pipe -ffunction-sections -fdata-sections -O2 -fPIC"
+  PFLAGS="-fno-delete-null-pointer-checks -Wno-incompatible-pointer-types"
+  PXXFLAGS="-fno-delete-null-pointer-checks"
+  GCFLAGS="-Wl,-O1 -Wl,--sort-section=name -Wl,--gc-sections"
+  SLKCFLAGS="$ARCHFLAGS $PFLAGS"
+  SLKCXXFLAGS="$ARCHFLAGS $PXXFLAGS"
+  SLDFLAGS="$GCFLAGS"
+else  
+echo "this slackbuild will work only on $ARCH" && exit 1
+fi
+
+export m=/opt/meson/bin # meson path
+export r=/opt/rust/bin # rust path
+export rl=/opt/rust/lib64
+
+PYVER=$(python3 -c 'import sys; print("%d.%d" % sys.version_info[:2])')
+export PYTHONPATH=/opt/python$PYVER/site-packages
+export PATH=$m:$r:$PATH
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$rl
+
+export CC=${CC:-gcc}
+export CXX=${CXX:-g++}
+export CFLAGS="$SLKCFLAGS"
+export CXXFLAGS="$SLKCXXFLAGS"
+export LDFLAGS="$SLDFLAGS"
+
+rm -rf $PKG
+mkdir -pv $TMP $PKG $OUTPUT
+mkdir -pv $DOCDIR
+
+if [ ! -z "${PRINT_PACKAGE_NAME}" ]; then
+  echo "$PRGNAM-$VERSION-$ARCH-$BUILD$TAG.$PKGTYPE"
+  exit 0
+fi
+
+# dependency name
+
+#projectM
+projmnam=projectm
+projmver=3.1.12
+
+#libspatialaudio
+spalnam=libspatialaudio
+spalver=0.3.0
+
+# live555
+livenam=live
+livever=2025.05.24
+
+#libdsm
+dsmnam=libdsm
+dsmver=0.4.3
+
+#vcdimager
+vcdnam=vcdimager
+vcdver=2.0.1
+
+# upnp
+upnpnam=pupnp-release
+upnpver=1.14.25
+
+#tremor
+tremnam=tremor
+tremurl=${tremurl:-https://gitlab.xiph.org/xiph/tremor.git}
+
+REQUIRES=( "vlc-dep-O" )
+pkgdir=/var/log/packages
+
+full=()
+empty=()
+for pkg in "${REQUIRES[@]}"; do
+if ! grep -q "$pkg" "$pkgdir"/*; then
+empty+=("$pkg")
+fi
+  if y=$(ls -1 /var/log/packages | grep -w "$pkg"); then
+        full+=("$pkg")
+    fi
+done
+if [ ${#full[@]} -ne 0 ]; then
+echo "The following Required packages are installed:"
+printf '%s\n' "${full[@]}"
+fi
+if [ ${#empty[@]} -ne 0 ]; then
+    echo "The following files are missing:"
+    printf '%s\n' "${empty[@]}"
+    echo "Install the dependencies" && exit 1
+else
+    echo "All dependencies are satisfied."
+fi
+
+DOWNLOAD=( "https://github.com/projectM-visualizer/projectm/archive/v3.1.12/projectm-3.1.12.tar.gz|$projmnam-$projmver.tar.gz"
+"https://github.com/videolabs/libspatialaudio/archive/0.3.0/libspatialaudio-0.3.0.tar.gz|$spalnam-$spalver.tar.gz"
+"http://download.videolan.org/contrib/live555/live.2025.05.24.tar.gz|$livenam.$livever.tar.gz"
+"https://github.com/videolabs/libdsm/archive/v0.4.3/libdsm-0.4.3.tar.gz|$dsmnam-$dsmver.tar.gz"
+"ftp://ftp.gnu.org/gnu/vcdimager/vcdimager-2.0.1.tar.gz|$vcdnam-$vcdver.tar.gz"
+"https://github.com/pupnp/pupnp/archive/release-1.14.25/pupnp-release-1.14.25.tar.gz|$upnpnam-$upnpver.tar.gz"
+)
+
+for entry in "${DOWNLOAD[@]}"; do
+# Parse URL and FILENAME safely
+IFS='|' read -r URL FILENAME <<< "$entry"
+# Validate entry format
+if [[ -z "$URL" || -z "$FILENAME" ]]; then
+        echo "Invalid entry: '$entry' (expected URL|FILENAME)"
+        continue
+fi
+# Check if file already exists and is non-empty
+if [[ -s "$FILENAME" ]]; then
+        echo "File '$FILENAME' already exists. Skipping download."
+        continue
+fi
+echo "Downloading '$FILENAME'..."
+# Attempt download
+if wget -L "$URL" -O "$FILENAME"; then
+        # Verify file is not empty
+if [[ ! -s "$FILENAME" ]]; then
+            echo "Error: Downloaded file '$FILENAME' is empty."
+            rm -f "$FILENAME"
+else
+            echo "Downloaded '$FILENAME' successfully."
+fi
+else
+echo "Error: Failed to download '$FILENAME'"rm -f "$FILENAME"
+continue
+fi
+done
+
+chksum=( "8b583aa05d1ab66985fa89d593b480d5|projectm-3.1.12.tar.gz"
+"ff1c0cbf90fa9c01b566614005d28c61|libspatialaudio-0.3.0.tar.gz"
+"36b2945c941cbf6024845fceb8be0153|live.2025.05.24.tar.gz"
+"46f7e582099750e885e17f0c4faf2e41|libdsm-0.4.3.tar.gz"
+"3890d73da62d0607c87962c41cd33a29|vcdimager-2.0.1.tar.gz"
+"517c9ccb754f6f3a89344cd30e4e4a12|pupnp-release-1.14.25.tar.gz" )
+
+for entry in "${chksum[@]}"; do
+IFS="|" read -r HASH FILENAME <<< "$entry"
+echo "$HASH  $FILENAME" | md5sum --warn --strict --check --status
+ if [ $? -eq 0 ]; then
+        echo "SUCCESS: $FILENAME matches checksum."
+    else
+        echo "FAILURE: $FILENAME checksum mismatch!"
+        exit 1
+    fi
+done
+
+cd $TMP
+
+# Building tremor
+
+git clone --depth 1 $tremurl
+cd $tremnam
+chown -R root:root .
+find -L . \
+ \( -perm 777 -o -perm 775 -o -perm 750 -o -perm 711 -o -perm 555 \
+  -o -perm 511 \) -exec chmod 755 {} \+ -o \
+ \( -perm 666 -o -perm 664 -o -perm 640 -o -perm 600 -o -perm 444 \
+  -o -perm 440 -o -perm 400 \) -exec chmod 644 {} \+
+
+./autogen.sh
+CFLAGS="$SLKCFLAGS" \
+CXXFLAGS="$SLKCXXFLAGS" \
+LDFLAGS="$SLDFLAGS" \
+./configure \
+  --prefix=/usr \
+  --includedir=/usr/include \
+  --sysconfdir=/etc \
+  --libdir=/usr/lib${LIBDIRSUFFIX} \
+  --localstatedir=/var \
+  --mandir=/usr/man \
+  --infodir=/usr/info \
+  --with-ogg=/usr \
+  --with-ogg-libraries=/usr/lib${LIBDIRSUFFIX} \
+  --with-ogg-includes=/usr/include/ogg \
+  --disable-low-accuracy \
+  --disable-oggtest   \
+  --enable-shared \
+  --enable-static \
+  --with-gnu-ld
+
+make -j$nprocr
+make install DESTDIR=$PKG
+
+mkdir -pv $DOCDIR/$tremnam
+cp -av COPYING README $DOCDIR/$tremnam
+
+rm -f $PKG/usr/lib${LIBDIRSUFFIX}/*.la
+
+cd $TMP
+
+# Building libupnp
+
+rm -rf $upnpnam-$upnpver
+tar xvf $CWD/$upnpnam-$upnpver.tar.gz
+cd $upnpnam-$upnpver
+chown -R root:root .
+find -L . \
+ \( -perm 777 -o -perm 775 -o -perm 750 -o -perm 711 -o -perm 555 \
+  -o -perm 511 \) -exec chmod 755 {} \+ -o \
+ \( -perm 666 -o -perm 664 -o -perm 640 -o -perm 600 -o -perm 444 \
+  -o -perm 440 -o -perm 400 \) -exec chmod 644 {} \+
+
+./bootstrap
+CFLAGS="$SLKCFLAGS" \
+CXXFLAGS="$SLKCXXFLAGS" \
+LDFLAGS="$SLDFLAGS" \
+./configure \
+  --prefix=/usr \
+  --includedir=/usr/include \
+  --sysconfdir=/etc \
+  --libdir=/usr/lib${LIBDIRSUFFIX} \
+  --localstatedir=/var \
+  --mandir=/usr/man \
+  --infodir=/usr/info \
+  --enable-client \
+  --enable-device \
+  --enable-webserver \
+  --enable-ssdp \
+  --enable-optssdp \
+  --enable-soap \
+  --enable-gena \
+  --enable-tools \
+  --enable-ipv6 \
+  --enable-open_ssl  \
+  --enable-blocking_tcp_connections \
+  --enable-scriptsupport \
+  --enable-reuseaddr \
+  --disable-postwrite \
+  --disable-samples \
+  --disable-debug \
+  --enable-shared \
+  --enable-static \
+  --with-gnu-ld
+
+make -j$nprocr
+make install DESTDIR=$PKG
+
+mkdir -pv $DOCDIR/$upnpnam-$upnpver
+cp -av COPYING README.md THANKS $DOCDIR/$upnpnam-$upnpver
+
+rm -f $PKG/usr/lib${LIBDIRSUFFIX}/*.la
+
+cd $TMP
+
+#Building libdsm
+
+rm -rf $dsmnam-$dsmver
+tar xvf $CWD/$dsmnam-$dsmver.tar.gz
+cd $dsmnam-$dsmver
+chown -R root:root .
+find -L . \
+ \( -perm 777 -o -perm 775 -o -perm 750 -o -perm 711 -o -perm 555 \
+  -o -perm 511 \) -exec chmod 755 {} \+ -o \
+ \( -perm 666 -o -perm 664 -o -perm 640 -o -perm 600 -o -perm 444 \
+  -o -perm 440 -o -perm 400 \) -exec chmod 644 {} \+
+
+CFLAGS="$SLKCFLAGS" CXXFLAGS="$SLKCXXFLAGS" LDFLAGS="$SLDFLAGS" meson setup build $TMP/$dsmnam-$dsmver \
+    -Dprefix=/usr \
+    -Dlibdir=/usr/lib${LIBDIRSUFFIX} \
+    -Dlocalstatedir=/var \
+    -Dmandir=/usr/man \
+    -Dsysconfdir=/etc \
+    -Dbuildtype=release \
+    -Dstrip=true
+
+ninja -j$nprocr -v -C build
+DESTDIR=$PKG ninja -C build install
+
+rm -f $PKG/usr/lib${LIBDIRSUFFIX}/*.la
+
+mkdir -pv $DOCDIR/$dsmnam-$dsmver
+cp -av AUTHORS COPYING README.md  $DOCDIR/$dsmnam-$dsmver
+mv -v $PKG/usr/share/doc/libdsm/html $DOCDIR/$dsmnam-$dsmver/html
+rm -rf $PKG/usr/share/doc
+
+cd $TMP
+
+# Building vcdimager
+
+rm -rf $vcdnam-$vcdver
+tar xvf $CWD/$vcdnam-$vcdver.tar.gz
+cd $vcdnam-$vcdver
+chown -R root:root .
+find -L . \
+ \( -perm 777 -o -perm 775 -o -perm 750 -o -perm 711 -o -perm 555 \
+  -o -perm 511 \) -exec chmod 755 {} \+ -o \
+ \( -perm 666 -o -perm 664 -o -perm 640 -o -perm 600 -o -perm 444 \
+  -o -perm 440 -o -perm 400 \) -exec chmod 644 {} \+
+
+CFLAGS="$SLKCFLAGS" \
+CXXFLAGS="$SLKCXXFLAGS" \
+LDFLAGS="$SLDFLAGS" \
+./configure \
+  --prefix=/usr \
+  --includedir=/usr/include \
+  --sysconfdir=/etc \
+  --libdir=/usr/lib${LIBDIRSUFFIX} \
+  --localstatedir=/var \
+  --mandir=/usr/man \
+  --infodir=/usr/info \
+  --enable-shared \
+  --enable-static \
+  --with-gnu-ld
+
+make -j$nprocr
+make install DESTDIR=$PKG
+
+mkdir -pv $DOCDIR/$vcdnam-$vcdver
+cp -av AUTHORS BUGS COPYING FAQ HACKING README THANKS $DOCDIR/$vcdnam-$vcdver
+
+rm -f $PKG/usr/lib${LIBDIRSUFFIX}/*.la
+
+cd $TMP
+
+# Building libspatialaudio
+
+rm -rf $spalnam-$spalver
+tar xvf $CWD/$spalnam-$spalver.tar.gz
+cd $spalnam-$spalver
+chown -R root:root .
+find -L . \
+ \( -perm 777 -o -perm 775 -o -perm 750 -o -perm 711 -o -perm 555 \
+  -o -perm 511 \) -exec chmod 755 {} \+ -o \
+ \( -perm 666 -o -perm 664 -o -perm 640 -o -perm 600 -o -perm 444 \
+  -o -perm 440 -o -perm 400 \) -exec chmod 644 {} \+
+
+#sed -i -e "s|${MYSOFA_ROOT_DIR}/lib|${MYSOFA_ROOT_DIR}/lib${LIBDIRSUFFIX}|g" CMakeLists.txt
+sed -i -e "s|DESTINATION lib|DESTINATION lib${LIBDIRSUFFIX}|g" CMakeLists.txt
+sed -i -e "s|DESTINATION lib/pkgconfig|DESTINATION lib${LIBDIRSUFFIX}/pkgconfig|g" CMakeLists.txt
+
+cmake -B build -S $TMP/$spalnam-$spalver \
+    -DCMAKE_C_FLAGS:STRING="$SLKCFLAGS" \
+    -DCMAKE_CXX_FLAGS:STRING="$SLKCXXFLAGS" \
+    -DCMAKE_C_FLAGS_RELEASE:STRING="$SLKCFLAGS" \
+    -DCMAKE_CXX_FLAGS_RELEASE:STRING="$SLKCXXFLAGS" \
+    -DCMAKE_EXE_LINKER_FLAGS:STRING="$SLDFLAGS" \
+    -DCMAKE_INSTALL_PREFIX:PATH=/usr \
+    -DCMAKE_INSTALL_BINDIR:PATH=/usr/bin \
+    -DCMAKE_INSTALL_DOCDIR:PATH=/usr/doc \
+    -DCMAKE_INSTALL_INCLUDEDIR:PATH=/usr/include \
+    -DCMAKE_INSTALL_LIBDIR:PATH=/usr/lib${LIBDIRSUFFIX} \
+    -DLIB_SUFFIX=${LIBDIRSUFFIX} \
+    -DBUILD_SHARED_LIBS:BOOL=ON \
+    -DHAVE_MIT_HRTF=ON \
+    -DCMAKE_BUILD_TYPE:STRING=Release
+
+cmake --build build --parallel $nprocr
+DESTDIR=$PKG cmake --install build
+
+sed -i -e "s|${prefix}/lib|${prefix}/lib${LIBDIRSUFFIX}|" $PKG/usr/lib${LIBDIRSUFFIX}/pkgconfig/spatialaudio.pc
+
+mkdir -pv $DOCDIR/$spalnam-$spalver
+cp -av LICENSE README.md $DOCDIR/$spalnam-$spalver
+
+rm -f $PKG/usr/lib${LIBDIRSUFFIX}/*.la
+
+cd $TMP
+
+# Building live555
+
+rm -rf $livenam.$livever
+tar xvf $CWD/$livenam.$livever.tar.gz
+cd $livenam
+rm -rvf testProgs/whiteroom.mp3
+chown -R root:root .
+find -L . \
+ \( -perm 777 -o -perm 775 -o -perm 750 -o -perm 711 -o -perm 555 \
+  -o -perm 511 \) -exec chmod 755 {} \+ -o \
+ \( -perm 666 -o -perm 664 -o -perm 640 -o -perm 600 -o -perm 444 \
+  -o -perm 440 -o -perm 400 \) -exec chmod 644 {} \+
+
+echo "first patch"
+patch -p1 --unified < $CWD/patches/add-pkgconfig-file.patch
+echo "second patch"
+patch -p1 --unified < $CWD/patches/android-no-ifaddrs.patch
+echo "third patch"
+patch -p1 --unified < $CWD/patches/expose_server_string.patch
+echo "fourth patch"
+patch -p1 --unified < $CWD/patches/file-offset-bits-64.patch
+echo "fifth patch"
+patch -p1 --unified < $CWD/patches/live555-formatmessage.patch
+echo "sixth patch"
+patch -p1 --unified < $CWD/patches/mingw-static-libs.patch
+
+# This header isn't shipped in glibc >= 2.26 anymore
+# https://sourceware.org/glibc/wiki/Release/2.26#Removal_of_.27xlocale.h.27
+sed -i 's/#include <xlocale.h>.*/#include <locale.h>/' liveMedia/include/Locale.hh
+
+sed -i 's|/local||g' config.linux-with-shared-libraries
+
+for f in $(find . -type f |xargs grep -l "PREFIX =") ; do echo $f; sed -i -e "/PREFIX =/c\PREFIX = \/usr" $f ; done
+for f in $(find . -type f |xargs grep -l "LIBDIR =") ; do echo $f; sed -i -e "/LIBDIR =/c\LIBDIR = \$(PREFIX)\/lib$LIBDIRSUFFIX" $f ; done
+
+sed -E 's|(-DSOCKLEN_T=socklen_t)|\1 -DRTSPCLIENT_SYNCHRONOUS_INTERFACE=1|g' -i config.linux-with-shared-libraries
+
+./genMakefiles linux-with-shared-libraries
+CFLAGS="$SLKCFLAGS" CXXFLAGS="$SLKCXXFLAGS -std=c++20" LDFLAGS="$SLDFLAGS" make
+make install DESTDIR=$PKG
+sed -i -e "s|prefix=|prefix=/usr|g" $PKG/pkgconfig/live555.pc
+sed -i -e "s|libdir=|libdir=/usr/lib${LIBDIRSUFFIX}|g" $PKG/pkgconfig/live555.pc
+mkdir -pv $PKG/usr/lib${LIBDIRSUFFIX}/pkgconfig
+mv -v $PKG/pkgconfig/live555.pc  $PKG/usr/lib${LIBDIRSUFFIX}/pkgconfig
+rm -rvf $PKG/pkgconfig
+chmod -v 0644 $PKG/usr/lib${LIBDIRSUFFIX}/pkgconfig/live555.pc
+
+mkdir -pv $DOCDIR/$livenam-$livever
+cp -av COPYING COPYING.LESSER README $DOCDIR/$livenam-$livever
+
+rm -f $PKG/usr/lib${LIBDIRSUFFIX}/*.la
+
+cd $TMP
+
+# Building projectM
+
+rm -rf $projmnam-$projmver
+tar xvf $CWD/$projmnam-$projmver.tar.gz
+cd $projmnam-$projmver
+chown -R root:root .
+find -L . \
+ \( -perm 777 -o -perm 775 -o -perm 750 -o -perm 711 -o -perm 555 \
+  -o -perm 511 \) -exec chmod 755 {} \+ -o \
+ \( -perm 666 -o -perm 664 -o -perm 640 -o -perm 600 -o -perm 444 \
+  -o -perm 440 -o -perm 400 \) -exec chmod 644 {} \+
+
+./autogen.sh
+CFLAGS="$SLKCFLAGS" \
+CXXFLAGS="$SLKCXXFLAGS" \
+LDFLAGS="$SLDFLAGS" \
+./configure \
+  --prefix=/usr \
+  --includedir=/usr/include \
+  --sysconfdir=/etc \
+  --libdir=/usr/lib${LIBDIRSUFFIX} \
+  --localstatedir=/var \
+  --mandir=/usr/man \
+  --infodir=/usr/info \
+  --enable-shared \
+  --enable-static \
+  --with-gnu-ld \
+  --with-x \
+  --enable-sdl \
+  --enable-threading \
+  --enable-gles \
+  --enable-pulseaudio \
+  --enable-qt \
+  --disable-emscripten \
+  --disable-sdltest \
+  --disable-sdlframework \
+  --disable-llvm \
+  --disable-jack
+
+make -j$nprocr
+make install DESTDIR=$PKG
+
+mkdir -pv $DOCDIR/$projmnam-$projmver
+cp -av AUTHORS.txt LICENSE.txt README.md $DOCDIR/$projmnam-$projmver
+
+rm -f $PKG/usr/lib${LIBDIRSUFFIX}/*.la
+
+cd $TMP
+
+find $PKG -print0 | xargs -0 file | grep -e "executable" -e "shared object" \
+  | grep ELF | cut -f 1 -d : | xargs strip --strip-unneeded --remove-section=.comment --remove-section=.note  2> /dev/null || true
+
+find $PKG/usr/man -type f -exec gzip -9 {} \;
+for i in $( find $PKG/usr/man -type l ) ; do ln -s $( readlink $i ).gz $i.gz ; rm $i ; done
+
+rm -f $PKG/usr/info/dir
+gzip -9 $PKG/usr/info/*.info* $PKG/usr/man/man*/*
+
+cat $CWD/$PRGNAM.SlackBuild > $DOCDIR/$PRGNAM.SlackBuild
+find $DOCDIR -type f -exec chmod 0644 {} \+
+find $PKG/usr/lib${LIBDIRSUFFIX} -type f -exec chmod 0755 {} \+
+find $PKG/usr/lib${LIBDIRSUFFIX} -name '*.a'  -type f -exec chmod 0644 {} \+
+
+mkdir -p $PKG/install
+cat $CWD/slack-desc > $PKG/install/slack-desc
+cat $CWD/doinst.sh > $PKG/install/doinst.sh
+cat $CWD/doinst.sh > $PKG/install/douninst.sh
+
+cd $PKG
+/sbin/makepkg -l y -c n --remove-rpaths --remove-tmp-rpaths $OUTPUT/$PRGNAM-$VERSION-$ARCH-$BUILD$TAG.$PKGTYPE

@@ -1,0 +1,297 @@
+#!/bin/bash
+
+# Slackware build script for gst-bad-deps-F
+
+# Copyright 2025-2026 Vijay Marcel
+# All rights reserved.
+#
+# Redistribution and use of this script, with or without modification, is
+# permitted provided that the following conditions are met:
+#
+# 1. Redistributions of this script must retain the above copyright
+#    notice, this list of conditions and the following disclaimer.
+#
+# 2. Redistributions in binary form must reproduce the above copyright
+#    notice, this list of conditions and the following disclaimer in
+#    the documentation and/or other materials provided with the distribution.
+#
+#  THIS SOFTWARE IS PROVIDED BY THE AUTHOR "AS IS" AND ANY EXPRESS OR IMPLIED
+#  WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+#  MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO
+#  EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+#  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+#  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
+#  OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+#  WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
+#  OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
+#  ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+cd $(dirname $0) ; CWD=$(pwd)
+
+PRGNAM=gst-bad-deps-F
+VERSION=${VERSION:-1.0}
+BUILD=${BUILD:-1}
+TAG=${TAG:-_SBo}
+PKGTYPE=${PKGTYPE:-tgz}
+nprocr=$(expr $(nproc))
+sys_arch=${sys_arch:-$(uname -m)}
+
+set -e
+trap 'echo "$0 FAILED at line $LINENO!" | tee -a $OUTPUT/error-${PRGNAM}.log' ERR
+
+case "$sys_arch" in
+   	x86_64) export ARCH=x86_64 ;;
+	     *) echo "This SlackBuild will not run on $sys_arch platform" && exit 1 ;;
+esac
+
+if [ "$ARCH" = "x86_64" ]; then
+  LIBDIRSUFFIX="64"
+  ARCHFLAGS="-march=native -m64 -pipe -ffunction-sections -fdata-sections -O2 -fPIC"
+  PFLAGS="-fno-delete-null-pointer-checks -Wno-incompatible-pointer-types"
+  PXXFLAGS="-fno-delete-null-pointer-checks"
+  GCFLAGS="-Wl,-O1 -Wl,--sort-section=name -Wl,--gc-sections"
+  SLKCFLAGS="$ARCHFLAGS $PFLAGS"
+  SLKCXXFLAGS="$ARCHFLAGS $PXXFLAGS"
+  SLDFLAGS="$GCFLAGS"
+else  
+echo "this slackbuild will work only on $ARCH" && exit 1
+fi
+
+TMP=${TMP:-/tmp/SBo}
+PKG=$TMP/package-$PRGNAM
+OUTPUT=${OUTPUT:-/tmp}
+DOCDIR=$PKG/usr/doc/$PRGNAM-$VERSION
+
+export CC=${CC:-gcc}
+export CXX=${CXX:-g++}
+export CFLAGS="$SLKCFLAGS"
+export CXXFLAGS="$SLKCXXFLAGS"
+export LDFLAGS="$SLDFLAGS"
+
+export m=/opt/meson/bin # meson path
+export r=/opt/rust/bin # rust path
+export rl=/opt/rust/lib64
+
+PYVER=$(python3 -c 'import sys; print("%d.%d" % sys.version_info[:2])')
+export PYTHONPATH=/opt/python$PYVER/site-packages
+export PATH=$m:$r:$PATH
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$rl
+
+rm -rf $PKG
+mkdir -p $TMP $PKG $OUTPUT
+mkdir -p $DOCDIR
+
+# libquicktime
+
+quicknam=${quicknam:-libquicktime}
+quickver=${quickver:-1.2.4}
+
+# liblrdf
+
+lrdfnam=${lrdfnam:-liblrdf}
+lrdfver=${lrdfver:-0.6.1}
+
+if [ ! -z "${PRINT_PACKAGE_NAME}" ]; then
+  echo "$PRGNAM-$VERSION-$ARCH-$BUILD$TAG.$PKGTYPE"
+  exit 0
+fi
+
+REQUIRES=( "gst-bad-deps-I" "musepack-tools" )
+pkgdir=/var/log/packages
+
+full=()
+empty=()
+for pkg in "${REQUIRES[@]}"; do
+if ! grep -q "$pkg" "$pkgdir"/*; then
+empty+=("$pkg")
+fi
+  if y=$(ls -1 /var/log/packages | grep -w "$pkg"); then
+        full+=("$pkg")
+    fi
+done
+if [ ${#full[@]} -ne 0 ]; then
+echo "The following Required packages are installed:"
+printf '%s\n' "${full[@]}"
+fi
+if [ ${#empty[@]} -ne 0 ]; then
+    echo "The following files are missing:"
+    printf '%s\n' "${empty[@]}"
+    echo "Install the dependencies" && exit 1
+else
+    echo "All dependencies are satisfied."
+fi
+
+DOWNLOAD=( "http://downloads.sourceforge.net/libquicktime/libquicktime-1.2.4.tar.gz|$quicknam-$quickver.tar.gz"
+"https://github.com/swh/LRDF/archive/v0.6.1/liblrdf-0.6.1.tar.gz|$lrdfnam-$lrdfver.tar.gz" )
+for entry in "${DOWNLOAD[@]}"; do
+# Parse URL and FILENAME safely
+IFS='|' read -r URL FILENAME <<< "$entry"
+# Validate entry format
+if [[ -z "$URL" || -z "$FILENAME" ]]; then
+        echo "Invalid entry: '$entry' (expected URL|FILENAME)"
+        continue
+fi
+# Check if file already exists and is non-empty
+if [[ -s "$FILENAME" ]]; then
+        echo "File '$FILENAME' already exists. Skipping download."
+        continue
+fi
+echo "Downloading '$FILENAME'..."
+# Attempt download
+if wget -L "$URL" -O "$FILENAME"; then
+        # Verify file is not empty
+if [[ ! -s "$FILENAME" ]]; then
+            echo "Error: Downloaded file '$FILENAME' is empty."
+            rm -f "$FILENAME"
+else
+            echo "Downloaded '$FILENAME' successfully."
+fi
+else
+echo "Error: Failed to download '$FILENAME'"
+rm -f "$FILENAME"
+continue
+fi
+done
+
+chksum=("81cfcebad9b7ee7e7cfbefc861d6d61b|libquicktime-1.2.4.tar.gz"
+"8bb0ac7e8fe1a5a90083c89776bd3deb|liblrdf-0.6.1.tar.gz" )
+
+for entry in "${chksum[@]}"; do
+IFS="|" read -r HASH FILENAME <<< "$entry"
+echo "$HASH  $FILENAME" | md5sum --warn --strict --check --status
+ if [ $? -eq 0 ]; then
+        echo "SUCCESS: $FILENAME matches checksum."
+    else
+        echo "FAILURE: $FILENAME checksum mismatch!"
+        exit 1
+    fi
+done
+
+cd $TMP
+
+# Building libquicktime
+
+rm -rf $quicknam-$quickver
+tar xvf $CWD/$quicknam-$quickver.tar.gz
+cd $quicknam-$quickver
+chown -R root:root .
+find -L . \
+ \( -perm 777 -o -perm 775 -o -perm 750 -o -perm 711 -o -perm 555 \
+  -o -perm 511 \) -exec chmod 755 {} \+ -o \
+ \( -perm 666 -o -perm 664 -o -perm 640 -o -perm 600 -o -perm 444 \
+  -o -perm 440 -o -perm 400 \) -exec chmod 644 {} \+
+
+# from SBO:Fix compatibility with ffmpeg 4.x
+patch -p1 -i $CWD/patches/libquicktime-1.2.4-ffmpeg2.patch
+patch -p1 -i $CWD/patches/libquicktime-ffmpeg3.patch
+patch -p1 -i $CWD/patches/libquicktime-1.2.4-ffmpeg4.patch
+
+# From SBo:Fix compiling against newer faad2
+patch -p1 -i $CWD/patches/libquicktime-1.2.4-faad2.patch
+
+mkdir -pv $DOCDIR/$quicknam-$quickver
+
+autoreconf -vif
+
+CFLAGS="$SLKCFLAGS" \
+CXXFLAGS="$SLKCXXFLAGS" \
+LDFLAGS="$SLDFLAGS" \
+./configure \
+  --prefix=/usr \
+  --libdir=/usr/lib${LIBDIRSUFFIX} \
+  --sysconfdir=/etc \
+  --localstatedir=/var \
+  --mandir=/usr/man \
+  --docdir=/usr/doc/$PRGNAM-$VERSION/$quicknam-$quickver \
+  --enable-gpl \
+  --with-libdv \
+  --with-gnu-ld  \
+  --with-x \
+  --with-lame \
+  --with-opengl \
+  --with-alsa \
+  --with-gtk \
+  --with-libjpeg \
+  --with-ffmpeg \
+  --with-libpng \
+  --with-schroedinger \
+  --with-faac \
+  --with-faad2 \
+  --with-x264 \
+  --disable-debug \
+  --without-sndio \
+  --without-doxygen \
+  --build=$ARCH-slackware-linux
+
+make -j$nprocr
+make install DESTDIR=$PKG
+
+rm -vf $PKG/usr/lib${LIBDIRSUFFIX}/*.la
+rm -vf $PKG/usr/lib${LIBDIRSUFFIX}/libquicktime/*.la
+
+cp -av COPYING README $DOCDIR/$quicknam-$quickver
+
+cd $TMP
+
+# Building liblrdf
+
+rm -rf LRDF-$lrdfver
+tar xvf $CWD/$lrdfnam-$lrdfver.tar.gz
+cd LRDF-$lrdfver
+chown -R root:root .
+find -L . \
+ \( -perm 777 -o -perm 775 -o -perm 750 -o -perm 711 -o -perm 555 \
+  -o -perm 511 \) -exec chmod 755 {} \+ -o \
+ \( -perm 666 -o -perm 664 -o -perm 640 -o -perm 600 -o -perm 444 \
+  -o -perm 440 -o -perm 400 \) -exec chmod 644 {} \+
+
+mkdir -p $DOCDIR/$lrdfnam-$lrdfver
+
+./autogen.sh
+CFLAGS="$SLKCFLAGS" \
+CXXFLAGS="$SLKCXXFLAGS" \
+LDFLAGS="$SLDFLAGS" \
+./configure \
+  --prefix=/usr \
+  --libdir=/usr/lib${LIBDIRSUFFIX} \
+  --sysconfdir=/etc \
+  --localstatedir=/var \
+  --enable-shared \
+  --with-gnu-ld    \
+  --build=$ARCH-slackware-linux
+
+make -j$nprocr
+make install DESTDIR=$PKG
+
+rm -f $PKG/usr/lib${LIBDIRSUFFIX}/*.la
+
+cp -a AUTHORS COPYING README $DOCDIR/$lrdfnam-$lrdfver
+
+cd $TMP
+
+find $PKG -print0 | xargs -0 file | grep -e "executable" -e "shared object" | grep ELF \
+  | cut -f 1 -d : | xargs strip --strip-unneeded --remove-section=.comment --remove-section=.note 2> /dev/null || true
+
+# Compress and if needed symlink the man pages:
+if [ -d $PKG/usr/man ]; then
+  ( cd $PKG/usr/man
+    for manpagedir in $(find . -type d -name "man*") ; do
+      ( cd $manpagedir
+        for eachpage in $( find . -type l -maxdepth 1) ; do
+          ln -s $( readlink $eachpage ).gz $eachpage.gz
+          rm $eachpage
+        done
+        gzip -9 *.?
+      )
+    done
+  )
+fi
+
+cat $CWD/$PRGNAM.SlackBuild > $DOCDIR/$PRGNAM.SlackBuild
+find $DOCDIR -type f -exec chmod 0644 {} \+
+
+mkdir -p $PKG/install
+cat $CWD/slack-desc > $PKG/install/slack-desc
+
+cd $PKG
+/sbin/makepkg -l y -c n --remove-rpaths --remove-tmp-rpaths $OUTPUT/$PRGNAM-$VERSION-$ARCH-$BUILD$TAG.$PKGTYPE

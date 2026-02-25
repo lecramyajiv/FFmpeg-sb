@@ -1,0 +1,14 @@
+python3-build
+python3-wheel
+python3-packaging-opt
+python3-setuptools-opt
+python3-glad
+python3-meson-opt
+rust-opt
+vmaf
+x265
+ffmpeg-dep-O
+ffmpeg-dep-I
+ffmpeg-dep-II
+ffmpeg-dep-III
+ffmpeg 

@@ -1,0 +1,75 @@
+https://github.com/drowe67/codec2/archive/1.2.0/codec2-1.2.0.tar.gz
+https://github.com/festvox/flite/archive/v2.2/flite-2.2.tar.gz
+https://github.com/lecramyajiv/flite-voice-0/archive/1.1/flite-voice-0-1.1.tar.gz
+https://github.com/lecramyajiv/flite-voice-01/archive/1.1/flite-voice-01-1.1.tar.gz
+https://github.com/lecramyajiv/flite-voice-02/archive/1.1/flite-voice-02-1.1.tar.gz
+https://github.com/lecramyajiv/flite-voice-in01/archive/1.0/flite-voice-in01-1.0.tar.gz
+https://github.com/lecramyajiv/flite-voice-in02/archive/1.0/flite-voice-in02-1.0.tar.gz
+https://github.com/lecramyajiv/flite-voice-in03/archive/1.0/flite-voice-in03-1.0.tar.gz
+https://github.com/DanBloomberg/leptonica/archive/1.85.0/leptonica-1.85.0.tar.gz
+https://github.com/stoth68000/libklvanc/archive/b409fc2/libklvanc-b409fc2.tar.gz
+http://downloads.sourceforge.net/modplug-xmms/libmodplug-0.8.9.0.tar.gz
+https://github.com/toots/shine/archive/ab5e352/shine-ab5e352.tar.gz
+https://github.com/google/snappy/archive/1.2.2/snappy-1.2.2.tar.gz
+https://github.com/uavs3/uavs3d/archive/1fd0491/uavs3d-1fd0491.tar.gz
+https://code.videolan.org/rist/librist/-/archive/v0.2.11/librist-v0.2.11.tar.gz
+https://lib.openmpt.org/files/libopenmpt/src/libopenmpt-0.8.4+release.autotools.tar.gz
+https://github.com/libass/libass/releases/download/0.17.3/libass-0.17.3.tar.xz
+https://github.com/numactl/numactl/releases/download/v2.0.19/numactl-2.0.19.tar.gz
+https://code.soundsoftware.ac.uk/attachments/download/2691/vamp-plugin-sdk-2.10.0.tar.gz
+https://salsa.debian.org/multimedia-team/aom/-/archive/debian/3.13.1-2/aom-debian-3.13.1-2.tar.gz
+https://github.com/haasn/libplacebo/archive/v7.351.0/libplacebo-v7.351.0.tar.gz
+https://github.com/vapoursynth/vapoursynth/archive/R71/vapoursynth-R71.tar.gz
+https://github.com/cisco/openh264/archive/v2.6.0/openh264-2.6.0.tar.gz
+
+
+# Building cpuinfo
+
+rm -rf $cpunam-$cpucom
+tar xvf $CWD/$cpunam-$cpuver.tar.gz
+cd $cpunam-$cpucom
+chown -R root:root .
+find -L . \
+ \( -perm 777 -o -perm 775 -o -perm 750 -o -perm 711 -o -perm 555 \
+  -o -perm 511 \) -exec chmod 755 {} \+ -o \
+ \( -perm 666 -o -perm 664 -o -perm 640 -o -perm 600 -o -perm 444 \
+  -o -perm 440 -o -perm 400 \) -exec chmod 644 {} \+
+
+cmake -B build -S $TMP/$cpunam-$cpucom \
+    -DCMAKE_C_FLAGS:STRING="$SLKCFLAGS" \
+    -DCMAKE_CXX_FLAGS:STRING="$SLKCXXFLAGS" \
+    -DCMAKE_C_FLAGS_RELEASE:STRING="$SLKCFLAGS" \
+    -DCMAKE_CXX_FLAGS_RELEASE:STRING="$SLKCXXFLAGS" \
+    -DCMAKE_EXE_LINKER_FLAGS:STRING="$SLDFLAGS" \
+    -DCMAKE_INSTALL_PREFIX:PATH=/usr \
+    -DCMAKE_INSTALL_LIBDIR:PATH=/usr/lib${LIBDIRSUFFIX} \
+    -DCMAKE_INSTALL_BINDIR:PATH=/usr/bin \
+    -DCMAKE_INSTALL_MANDIR:PATH=/usr/man \
+    -DCPUINFO_LIBRARY_TYPE=shared \
+    -DCPUINFO_RUNTIME_TYPE=shared \
+    -DCPUINFO_LOG_LEVEL=none \
+    -DCPUINFO_LOG_TO_STDIO=OFF \
+    -DCPUINFO_BUILD_UNIT_TESTS=OFF \
+    -DCPUINFO_BUILD_MOCK_TESTS=OFF \
+    -DCPUINFO_BUILD_BENCHMARKS=OFF \
+    -DUSE_SYSTEM_LIBS=ON \
+    -DCMAKE_BUILD_TYPE=Release
+
+cmake --build build --parallel $nprocr
+DESTDIR=$PKG cmake --install build
+
+rm -f $PKG/usr/lib${LIBDIRSUFFIX}/*.la
+
+mkdir -pv $PKG/usr/doc/$PRGNAM-$VERSION/$cpunam
+cp -av LICENSE README.md CONTRIBUTING.md $PKG/usr/doc/$PRGNAM-$VERSION/$cpunam
+
+cd $TMP
+
+
+# cryptopp
+crypnam=${crypnam:-cryptopp}
+crypver=${crypver:-CRYPTOPP_8_9_0}
+#cpuinfo
+cpunam=${cpunam:-cpuinfo}
+cpucom=${cpucom:-de0ce7c7251372892e53ce9bc891750d2c9a4fd8}
+cpuver=${cpuver:-de0ce7c}
